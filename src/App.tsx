@@ -29,7 +29,7 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
 
 function App() {
   return (
-    <ThemeProvider defaultTheme="system" storageKey="vite-ui-theme">
+    <ThemeProvider defaultTheme="light" storageKey="vite-ui-theme">
       <AuthProvider>
         <Router basename={import.meta.env.BASE_URL}>
           <Routes>
