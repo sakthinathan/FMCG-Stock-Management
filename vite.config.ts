@@ -4,8 +4,8 @@ import { defineConfig } from 'vite'
 import { VitePWA } from 'vite-plugin-pwa'
 
 // https://vite.dev/config/
-export default defineConfig({
-  base: '/FMCG-Stock-Management/',
+export default defineConfig(({ mode }) => ({
+  base: mode === 'production' ? '/FMCG-Stock-Management/' : '/',
   plugins: [
     react(),
     VitePWA({
@@ -36,4 +36,4 @@ export default defineConfig({
       "@": resolve(import.meta.dirname, "./src"),
     },
   },
-})
+}))
