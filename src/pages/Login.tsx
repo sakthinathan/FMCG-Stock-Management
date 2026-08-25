@@ -31,15 +31,18 @@ export function Login() {
     }}>
       {/* Logo + Title */}
       <div style={{ textAlign: 'center', marginBottom: 28 }}>
-        <div style={{
-          width: 72, height: 72, borderRadius: 20, background: 'linear-gradient(135deg, #4f46e5, #7c3aed)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 18px',
-          boxShadow: '0 8px 32px rgba(79,70,229,0.4)',
-        }}>
-          <PackageSearch size={32} color="#fff" />
-        </div>
-        <h1 style={{ fontSize: 26, fontWeight: 800, color: '#fff', margin: '0 0 4px', letterSpacing: '-0.5px' }}>STOCKSYNC</h1>
-        <p style={{ fontSize: 13, color: '#94a3b8', margin: 0, letterSpacing: '0.02em' }}>FMCG Stock Reconciliation System</p>
+        <img 
+          src={`${import.meta.env.BASE_URL}britannia_logo.png`} 
+          alt="Britannia Logo"
+          style={{
+            height: 64,
+            objectFit: 'contain',
+            margin: '0 auto 18px',
+            display: 'block'
+          }}
+        />
+        <h1 style={{ fontSize: 26, fontWeight: 800, color: '#fff', margin: '0 0 4px', letterSpacing: '-0.5px' }}>THULIR AGENCY</h1>
+        <p style={{ fontSize: 13, color: '#94a3b8', margin: 0, letterSpacing: '0.02em', textTransform: 'uppercase', fontWeight: 600 }}>Stock Management</p>
       </div>
 
       {/* Card */}
