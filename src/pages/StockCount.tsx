@@ -40,6 +40,7 @@ export function StockCount() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
+  const [mobileListOpen, setMobileListOpen] = useState(false);
 
   // Input states
   const [cbb, setCbb] = useState('');
@@ -296,8 +297,56 @@ export function StockCount() {
         <button onClick={() => navigate('/brands')} style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', color: '#64748b', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}>
           <ArrowLeft size={16} /> Brands Selection
         </button>
-        <span style={{ fontSize: 13, fontWeight: 700, color: '#4f46e5' }}>{brandName} Queue</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <button onClick={() => setMobileListOpen(true)} className="mobile-list-toggle-btn"
+            style={{ padding: '6px 12px', background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 12, fontWeight: 600, color: '#4f46e5', cursor: 'pointer', fontFamily: 'inherit' }}>
+            Show SKUs List
+          </button>
+          <span style={{ fontSize: 13, fontWeight: 700, color: '#4f46e5' }}>{brandName} Queue</span>
+        </div>
       </div>
+
+      {/* Mobile overlay list */}
+      {mobileListOpen && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 99, display: 'flex' }} onClick={() => setMobileListOpen(false)}>
+          <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.4)' }} />
+          <div style={{ position: 'relative', width: 280, background: '#fff', height: '100%', display: 'flex', flexDirection: 'column', padding: '10px 0' }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 16px', borderBottom: '1px solid #f1f5f9' }}>
+              <span style={{ fontSize: 14, fontWeight: 700, color: '#0f172a' }}>SKUs Queue</span>
+              <button onClick={() => setMobileListOpen(false)} style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#64748b', fontSize: 16 }}>✕</button>
+            </div>
+            {/* search & filters */}
+            <div style={{ padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <input
+                placeholder="Filter items..."
+                value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
+                style={{ width: '100%', height: 32, paddingLeft: 8, paddingRight: 8, border: '1px solid #e2e8f0', borderRadius: 6, fontSize: 12, outline: 'none', boxSizing: 'border-box' }}
+              />
+              <div style={{ display: 'flex', gap: 6 }}>
+                <button onClick={() => { setHideCounted(!hideCounted); setIssuesOnly(false); }} style={{ flex: 1, padding: '4px', fontSize: 10, background: hideCounted ? '#eef2ff' : '#fff', color: hideCounted ? '#4f46e5' : '#475569', border: '1px solid #e2e8f0', borderRadius: 4 }}>Hide Counted</button>
+                <button onClick={() => { setIssuesOnly(!issuesOnly); setHideCounted(false); }} style={{ flex: 1, padding: '4px', fontSize: 10, background: issuesOnly ? '#fef2f2' : '#fff', color: issuesOnly ? '#dc2626' : '#475569', border: '1px solid #e2e8f0', borderRadius: 4 }}>Issues Only</button>
+              </div>
+            </div>
+            <div style={{ flex: 1, overflowY: 'auto', padding: 8 }}>
+              {filteredProducts.map(p => {
+                const active = p.id === selectedProductId;
+                const isCounted = p.existingCbb !== '' || p.existingPcs !== '';
+                const sc = statusStyle(p.existingStatus);
+                return (
+                  <div key={p.id} onClick={() => { setSelectedProductId(p.id); setMobileListOpen(false); }}
+                    style={{ padding: '8px 10px', borderRadius: 6, marginBottom: 4, background: active ? '#eef2ff' : 'transparent', borderLeft: `3px solid ${isCounted ? sc.border : 'transparent'}`, cursor: 'pointer' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, fontWeight: 700, color: active ? '#4f46e5' : '#475569', marginBottom: 2 }}>
+                      <span>{p.material}</span>
+                      {isCounted && <span>{p.existingStatus}</span>}
+                    </div>
+                    <p style={{ fontSize: 11, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.material_desc}</p>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Main split layout */}
       <div className="stock-count-layout" style={{ display: 'flex', gap: 20 }}>
@@ -506,8 +555,13 @@ export function StockCount() {
 
       <style>{`
         .stock-count-layout { display: flex; }
+        @media (min-width: 1024px) {
+          .skus-list-panel { display: flex !important; }
+          .mobile-list-toggle-btn { display: none !important; }
+        }
         @media (max-width: 1023px) {
           .skus-list-panel { display: none !important; }
+          .mobile-list-toggle-btn { display: inline-block !important; }
         }
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
       `}</style>
