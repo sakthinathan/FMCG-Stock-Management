@@ -71,7 +71,7 @@ export const parseExcelFile = async (file: File): Promise<ParseResult> => {
             mrp: isNaN(mrp) ? 0 : mrp,
             goodQty: isNaN(goodQty) ? 0 : goodQty,
             conversion: isNaN(conversion) || conversion <= 0 ? 1 : conversion,
-            systemQtyPcs: (isNaN(goodQty) ? 0 : goodQty) * (isNaN(conversion) || conversion <= 0 ? 1 : conversion),
+            systemQtyPcs: isNaN(goodQty) ? 0 : Math.round(goodQty),
             prevVariance: Math.floor(Math.random() * 50) - 25, // Mock previous variance between -25 and +25 for testing
           });
         });
