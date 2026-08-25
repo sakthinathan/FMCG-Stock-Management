@@ -8,7 +8,7 @@ import { useStockStore } from '@/store/useStockStore';
 import { supabase } from '@/lib/supabase';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
-import 'jsPDF-autotable';
+import 'jspdf-autotable';
 import { useNavigate } from 'react-router-dom';
 
 type ReportType = 'full' | 'shortage' | 'excess' | 'increased_variance' | 'new_issues' | 'historical_comparison' | 'brand_summary';
