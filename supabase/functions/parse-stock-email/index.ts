@@ -29,27 +29,28 @@ serve(async (req) => {
     let fileBytes: Uint8Array
 
     if (contentType.includes('application/json')) {
-      // ── Scenario A: JSON Inbound Email Webhook ──
+      // ── Scenario A: JSON Inbound Email Webhook (Postmark / CloudMailin) ──
       const body = await req.json()
       
-      const toEmail = body.To || ""
+      const toEmail = body.To || (body.headers && body.headers.to) || ""
       const agencyIdMatch = toEmail.match(/([a-fA-F0-9-]{36})/)
       if (!agencyIdMatch) {
         throw new Error("Could not find a valid 36-character Agency UUID in the recipient address ('To' header).")
       }
       agencyId = agencyIdMatch[1]
 
-      const attachments = body.Attachments || []
-      const excelAttachment = attachments.find((att: any) =>
-        att.Name.endsWith('.xlsx') ||
-        att.ContentType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-      )
+      const attachments = body.Attachments || body.attachments || []
+      const excelAttachment = attachments.find((att: any) => {
+        const name = att.Name || att.file_name || ''
+        const contentTypeAttr = att.ContentType || att.content_type || ''
+        return name.endsWith('.xlsx') || contentTypeAttr === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      })
       if (!excelAttachment) {
         throw new Error("No valid Excel (.xlsx) file attachment found in the email payload.")
       }
-      fileName = excelAttachment.Name
+      fileName = excelAttachment.Name || excelAttachment.file_name
       
-      const base64Content = excelAttachment.Content
+      const base64Content = excelAttachment.Content || excelAttachment.content
       const binaryString = atob(base64Content)
       const len = binaryString.length
       fileBytes = new Uint8Array(len)
