@@ -4,7 +4,23 @@ import { Package, AlertCircle, CheckCircle2, AlertTriangle, Loader2, ArrowRight,
 import { useStockStore } from '@/store/useStockStore';
 import { supabase } from '@/lib/supabase';
 
-const card: React.CSSProperties = { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, boxShadow: '0 1px 3px rgba(0,0,0,0.06)' };
+const W: React.CSSProperties = { background: '#fff', borderRadius: 12, boxShadow: '0 1px 3px rgba(0,0,0,0.06)' };
+
+// KPI card with left colored border like payroll system
+function KpiCard({ label, value, sub, borderColor, icon: Icon, iconColor }: any) {
+  return (
+    <div style={{ ...W, padding: '20px 20px 18px', borderLeft: `4px solid ${borderColor}`, display: 'flex', alignItems: 'flex-start', gap: 14 }}>
+      <div style={{ flex: 1 }}>
+        <p style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', margin: '0 0 8px' }}>{label}</p>
+        <p style={{ fontSize: 32, fontWeight: 800, color: '#0f172a', margin: '0 0 4px', lineHeight: 1.1 }}>{value}</p>
+        <p style={{ fontSize: 12, color: '#94a3b8', margin: 0 }}>{sub}</p>
+      </div>
+      <div style={{ width: 44, height: 44, borderRadius: 12, background: `${borderColor}15`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+        <Icon size={22} color={borderColor} />
+      </div>
+    </div>
+  );
+}
 
 export function Dashboard() {
   const navigate = useNavigate();
@@ -33,7 +49,7 @@ export function Dashboard() {
         });
         issueList.sort((a, b) => Math.abs(b.variance) - Math.abs(a.variance));
         setStats({ totalBrands: brands, totalProducts: total, countedProducts: counted, pendingProducts: total - counted, equalCount: eq, shortage: sh, excess: ex });
-        setIssues(issueList.slice(0, 6));
+        setIssues(issueList.slice(0, 8));
       } catch (e) { console.error(e); }
       finally { setLoading(false); }
     }
@@ -42,18 +58,18 @@ export function Dashboard() {
     return () => { supabase.removeChannel(ch); };
   }, [activeUploadId]);
 
-  if (loading) return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 240 }}><Loader2 size={30} color="#4f46e5" style={{ animation: 'spin 1s linear infinite' }} /></div>;
+  if (loading) return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 240 }}><Loader2 size={32} color="#4f46e5" style={{ animation: 'spin 1s linear infinite' }} /></div>;
 
   if (!activeUploadId) return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60vh', textAlign: 'center', gap: 20 }}>
-      <div style={{ width: 64, height: 64, borderRadius: 16, background: '#eef2ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <UploadCloud size={30} color="#4f46e5" />
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '60vh', textAlign: 'center', gap: 20 }}>
+      <div style={{ width: 72, height: 72, borderRadius: 20, background: '#eef2ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <UploadCloud size={32} color="#4f46e5" />
       </div>
       <div>
-        <h2 style={{ fontSize: 20, fontWeight: 700, color: '#0f172a', margin: 0 }}>No Active Session</h2>
-        <p style={{ fontSize: 13, color: '#64748b', margin: '6px 0 0' }}>Upload a stock Excel file to start reconciliation</p>
+        <h2 style={{ fontSize: 22, fontWeight: 700, color: '#0f172a', margin: '0 0 8px' }}>No Active Session</h2>
+        <p style={{ fontSize: 14, color: '#64748b', margin: 0, maxWidth: 300 }}>Upload a stock Excel file to start the reconciliation process</p>
       </div>
-      <button onClick={() => navigate('/upload')} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 20px', borderRadius: 8, border: 'none', background: '#4f46e5', color: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
+      <button onClick={() => navigate('/upload')} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '11px 22px', borderRadius: 10, border: 'none', background: '#4f46e5', color: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
         <UploadCloud size={16} /> Upload Stock File
       </button>
     </div>
@@ -62,119 +78,111 @@ export function Dashboard() {
   const pct = stats.totalProducts > 0 ? Math.round((stats.countedProducts / stats.totalProducts) * 100) : 0;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20, fontFamily: "'Inter', sans-serif" }}>
 
-      {/* Page Header */}
-      <div style={{ ...card, padding: '18px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+      {/* Page header row */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <h1 style={{ fontSize: 20, fontWeight: 700, color: '#0f172a', margin: 0 }}>Dashboard</h1>
-            <span style={{ fontSize: 10, fontWeight: 600, background: '#eef2ff', color: '#4338ca', padding: '2px 8px', borderRadius: 9999, border: '1px solid #c7d2fe' }}>Live</span>
-          </div>
-          <p style={{ fontSize: 13, color: '#64748b', margin: '4px 0 0' }}>
-            <strong style={{ color: '#334155' }}>{filename}</strong>{uploadedAt && ` · ${new Date(uploadedAt).toLocaleDateString()}`}
+          <h1 style={{ fontSize: 22, fontWeight: 800, color: '#0f172a', margin: '0 0 3px', letterSpacing: '-0.3px' }}>Payroll Overview</h1>
+          <p style={{ fontSize: 13, color: '#64748b', margin: 0 }}>
+            <strong style={{ color: '#334155' }}>{filename}</strong>
+            {uploadedAt && <> &nbsp;·&nbsp; {new Date(uploadedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</>}
           </p>
         </div>
-        <button onClick={() => navigate('/brands')} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 18px', borderRadius: 8, border: 'none', background: '#4f46e5', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+        <button onClick={() => navigate('/brands')} style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '10px 20px', borderRadius: 10, border: 'none', background: '#4f46e5', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', boxShadow: '0 2px 8px rgba(79,70,229,0.3)' }}>
           Continue Count <ArrowRight size={14} />
         </button>
       </div>
 
-      {/* Progress */}
-      <div style={{ ...card, padding: '16px 24px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-          <span style={{ fontSize: 13, fontWeight: 600, color: '#334155' }}>Overall Progress</span>
-          <span style={{ fontSize: 14, fontWeight: 700, color: '#4f46e5' }}>{pct}%</span>
-        </div>
-        <div style={{ height: 8, background: '#f1f5f9', borderRadius: 9999, overflow: 'hidden' }}>
-          <div style={{ height: '100%', width: `${pct}%`, background: 'linear-gradient(90deg, #4f46e5, #7c3aed)', borderRadius: 9999, transition: 'width 0.5s ease' }} />
-        </div>
-        <p style={{ fontSize: 12, color: '#94a3b8', margin: '8px 0 0' }}>{stats.countedProducts} of {stats.totalProducts} SKUs audited</p>
+      {/* KPI cards — left border style like payroll */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16 }}>
+        <KpiCard label="Total Brands"   value={stats.totalBrands}    sub="Active categories"  borderColor="#4f46e5" icon={Building2}    iconColor="#4f46e5" />
+        <KpiCard label="Total SKUs"     value={stats.totalProducts}   sub="In master file"     borderColor="#10b981" icon={Package}      iconColor="#10b981" />
+        <KpiCard label="Pending Count"  value={stats.pendingProducts} sub="Awaiting audit"     borderColor="#f59e0b" icon={AlertCircle}  iconColor="#f59e0b" />
+        <KpiCard label="Total Issues"   value={stats.shortage + stats.excess} sub="Variances found" borderColor="#ef4444" icon={AlertTriangle} iconColor="#ef4444" />
       </div>
 
-      {/* KPI Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
-        {[
-          { label: 'Total Brands', value: stats.totalBrands, sub: 'categories', bg: '#eef2ff', color: '#4338ca', iconBg: '#c7d2fe' },
-          { label: 'Total SKUs', value: stats.totalProducts, sub: 'in master file', bg: '#fff', color: '#334155', iconBg: '#f1f5f9' },
-          { label: 'Counted', value: stats.countedProducts, sub: 'SKUs audited', bg: '#f0fdf4', color: '#15803d', iconBg: '#bbf7d0' },
-          { label: 'Pending', value: stats.pendingProducts, sub: 'awaiting count', bg: '#fffbeb', color: '#b45309', iconBg: '#fde68a' },
-        ].map(({ label, value, sub, bg, color, iconBg }) => (
-          <div key={label} style={{ background: bg, border: '1px solid #e2e8f0', borderRadius: 12, padding: '18px 20px' }}>
-            <p style={{ fontSize: 11, fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 10px' }}>{label}</p>
-            <p style={{ fontSize: 28, fontWeight: 700, color, margin: 0 }}>{value}</p>
-            <p style={{ fontSize: 12, color: '#94a3b8', margin: '4px 0 0' }}>{sub}</p>
-          </div>
-        ))}
-      </div>
-
-      {/* Discrepancy Counts */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
-        <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 12, padding: '16px 20px' }}>
-          <p style={{ fontSize: 11, fontWeight: 600, color: '#16a34a', textTransform: 'uppercase', letterSpacing: '0.06em', margin: 0 }}>Equal</p>
-          <p style={{ fontSize: 32, fontWeight: 700, color: '#15803d', margin: '6px 0 2px' }}>{stats.equalCount}</p>
-          <p style={{ fontSize: 11, color: '#4ade80', margin: 0 }}>Exact match</p>
-        </div>
-        <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 12, padding: '16px 20px' }}>
-          <p style={{ fontSize: 11, fontWeight: 600, color: '#dc2626', textTransform: 'uppercase', letterSpacing: '0.06em', margin: 0 }}>Shortage</p>
-          <p style={{ fontSize: 32, fontWeight: 700, color: '#b91c1c', margin: '6px 0 2px' }}>{stats.shortage}</p>
-          <p style={{ fontSize: 11, color: '#f87171', margin: 0 }}>Physical &lt; System</p>
-        </div>
-        <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 12, padding: '16px 20px' }}>
-          <p style={{ fontSize: 11, fontWeight: 600, color: '#d97706', textTransform: 'uppercase', letterSpacing: '0.06em', margin: 0 }}>Excess</p>
-          <p style={{ fontSize: 32, fontWeight: 700, color: '#b45309', margin: '6px 0 2px' }}>{stats.excess}</p>
-          <p style={{ fontSize: 11, color: '#fbbf24', margin: 0 }}>Physical &gt; System</p>
-        </div>
-      </div>
-
-      {/* Top Issues */}
-      <div style={{ ...card, overflow: 'hidden' }}>
-        <div style={{ padding: '14px 20px', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{ width: 32, height: 32, borderRadius: 8, background: '#fef2f2', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <AlertTriangle size={15} color="#dc2626" />
+      {/* Two column: progress + discrepancy summary */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+        {/* Progress card */}
+        <div style={{ ...W, padding: '20px 24px' }}>
+          <p style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', margin: '0 0 4px' }}>Audit Progress</p>
+          <p style={{ fontSize: 12, color: '#64748b', margin: '0 0 16px' }}>{stats.countedProducts} of {stats.totalProducts} SKUs counted</p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{ flex: 1, height: 8, background: '#f1f5f9', borderRadius: 9999, overflow: 'hidden' }}>
+              <div style={{ height: '100%', width: `${pct}%`, background: 'linear-gradient(90deg, #4f46e5, #7c3aed)', borderRadius: 9999, transition: 'width 0.6s ease' }} />
             </div>
-            <div>
-              <p style={{ fontSize: 14, fontWeight: 700, color: '#0f172a', margin: 0 }}>Top Discrepancies</p>
-              <p style={{ fontSize: 11, color: '#94a3b8', margin: '1px 0 0' }}>Largest variances by magnitude</p>
-            </div>
+            <span style={{ fontSize: 16, fontWeight: 800, color: '#4f46e5', flexShrink: 0 }}>{pct}%</span>
           </div>
-          <button onClick={() => navigate('/issues')} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '6px 12px', borderRadius: 7, border: '1px solid #e2e8f0', background: '#fff', color: '#4f46e5', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+        </div>
+
+        {/* Status summary */}
+        <div style={{ ...W, padding: '20px 24px' }}>
+          <p style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', margin: '0 0 16px' }}>Count Results</p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {[
+              { label: 'Equal (exact match)', value: stats.equalCount,   color: '#10b981' },
+              { label: 'Shortage (deficit)',  value: stats.shortage,      color: '#ef4444' },
+              { label: 'Excess (surplus)',    value: stats.excess,        color: '#f59e0b' },
+            ].map(r => (
+              <div key={r.label} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: r.color, display: 'inline-block' }} />
+                  <span style={{ fontSize: 13, color: '#475569', fontWeight: 500 }}>{r.label}</span>
+                </div>
+                <span style={{ fontSize: 16, fontWeight: 800, color: r.value > 0 ? r.color : '#94a3b8' }}>{r.value}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Issues table */}
+      <div style={{ ...W, overflow: 'hidden' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 24px 14px', borderBottom: '1px solid #f1f5f9' }}>
+          <div>
+            <p style={{ fontSize: 16, fontWeight: 700, color: '#0f172a', margin: '0 0 2px' }}>Top Discrepancies</p>
+            <p style={{ fontSize: 12, color: '#94a3b8', margin: 0 }}>Largest variances by magnitude</p>
+          </div>
+          <button onClick={() => navigate('/issues')} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '7px 14px', borderRadius: 8, border: '1px solid #e2e8f0', background: '#fff', color: '#4f46e5', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
             View All <ArrowRight size={12} />
           </button>
         </div>
 
         {issues.length === 0 ? (
-          <div style={{ padding: '48px 24px', textAlign: 'center' }}>
-            <CheckCircle2 size={36} color="#4ade80" style={{ margin: '0 auto 12px' }} />
-            <p style={{ fontWeight: 600, color: '#334155', margin: 0 }}>No Discrepancies Found</p>
-            <p style={{ fontSize: 12, color: '#94a3b8', margin: '4px 0 0' }}>All counted stock matches system records</p>
+          <div style={{ padding: '56px 24px', textAlign: 'center' }}>
+            <CheckCircle2 size={40} color="#10b981" style={{ margin: '0 auto 12px', display: 'block' }} />
+            <p style={{ fontSize: 15, fontWeight: 700, color: '#0f172a', margin: '0 0 4px' }}>No Discrepancies Found</p>
+            <p style={{ fontSize: 12, color: '#94a3b8', margin: 0 }}>All counted stock matches system records</p>
           </div>
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
               <thead>
-                <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
-                  {['Material', 'Brand', 'Status', 'Variance', 'Impact ₹'].map((h, i) => (
-                    <th key={h} style={{ padding: '10px 16px', fontSize: 11, fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em', textAlign: i >= 2 ? 'center' : 'left' }}>{h}</th>
+                <tr style={{ background: '#f8fafc', borderBottom: '1px solid #f1f5f9' }}>
+                  {['Material', 'Brand', 'Status', 'Variance', 'Value Impact'].map((h, i) => (
+                    <th key={h} style={{ padding: '10px 20px', fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.07em', textAlign: i >= 2 ? 'center' : 'left' }}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {issues.map(issue => (
-                  <tr key={issue.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                    <td style={{ padding: '12px 16px' }}>
-                      <p style={{ fontWeight: 600, color: '#0f172a', margin: 0 }}>{issue.material}</p>
-                      <p style={{ fontSize: 11, color: '#94a3b8', margin: '2px 0 0', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{issue.desc}</p>
+                  <tr key={issue.id} style={{ borderBottom: '1px solid #f8fafc' }}
+                    onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = '#fafbfc'}
+                    onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = '#fff'}
+                  >
+                    <td style={{ padding: '13px 20px' }}>
+                      <p style={{ fontWeight: 700, color: '#0f172a', margin: '0 0 2px', fontSize: 13 }}>{issue.material}</p>
+                      <p style={{ fontSize: 11, color: '#94a3b8', margin: 0, maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{issue.desc}</p>
                     </td>
-                    <td style={{ padding: '12px 16px', fontSize: 12, color: '#64748b', fontWeight: 500 }}>{issue.brand}</td>
-                    <td style={{ padding: '12px 16px', textAlign: 'center' }}>
-                      <span style={{ fontSize: 10, fontWeight: 600, padding: '3px 8px', borderRadius: 9999, background: issue.type === 'Shortage' ? '#fef2f2' : '#fffbeb', color: issue.type === 'Shortage' ? '#dc2626' : '#d97706' }}>{issue.type}</span>
+                    <td style={{ padding: '13px 20px', fontSize: 12, color: '#64748b', fontWeight: 500 }}>{issue.brand}</td>
+                    <td style={{ padding: '13px 20px', textAlign: 'center' }}>
+                      <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 9999, background: issue.type === 'Shortage' ? '#fef2f2' : '#fffbeb', color: issue.type === 'Shortage' ? '#dc2626' : '#d97706' }}>{issue.type}</span>
                     </td>
-                    <td style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 700, color: issue.variance < 0 ? '#dc2626' : '#d97706', fontSize: 13 }}>
+                    <td style={{ padding: '13px 20px', textAlign: 'center', fontWeight: 800, color: issue.variance < 0 ? '#dc2626' : '#d97706', fontSize: 14 }}>
                       {issue.variance > 0 ? '+' : ''}{issue.variance}
                     </td>
-                    <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 600, color: '#334155', fontSize: 13 }}>₹{issue.impact.toLocaleString('en-IN')}</td>
+                    <td style={{ padding: '13px 20px', textAlign: 'center', fontWeight: 700, color: '#0f172a', fontSize: 13 }}>₹{issue.impact.toLocaleString('en-IN')}</td>
                   </tr>
                 ))}
               </tbody>

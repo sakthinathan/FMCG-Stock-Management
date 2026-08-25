@@ -2,218 +2,231 @@ import React, { useState } from 'react';
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import {
   PackageSearch, UploadCloud, LayoutDashboard, Settings,
-  AlertTriangle, FileText, LogOut, ListChecks, Search, Menu, X
+  AlertTriangle, FileText, LogOut, ListChecks, Search, Menu, X, ChevronRight
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { AnimatePresence, motion } from 'framer-motion';
+import { useStockStore } from '@/store/useStockStore';
 
-const navItems = [
-  { icon: LayoutDashboard, label: 'Dashboard',  to: '/'        },
-  { icon: PackageSearch,  label: 'Count Stock', to: '/brands'  },
-  { icon: AlertTriangle,  label: 'Issues',      to: '/issues'  },
-  { icon: FileText,       label: 'Reports',     to: '/reports' },
-  { icon: UploadCloud,    label: 'Upload',      to: '/upload'  },
-  { icon: ListChecks,     label: 'Sessions',    to: '/sessions'},
-  { icon: Search,         label: 'Search',      to: '/search'  },
-  { icon: Settings,       label: 'Settings',    to: '/settings'},
+const navGroups = [
+  {
+    label: 'Overview',
+    items: [
+      { icon: LayoutDashboard, label: 'Dashboard', to: '/' },
+    ],
+  },
+  {
+    label: 'Stock Count',
+    items: [
+      { icon: PackageSearch,  label: 'Count by Brand', to: '/brands'   },
+      { icon: ListChecks,     label: 'Sessions',       to: '/sessions' },
+      { icon: Search,         label: 'Search Stock',   to: '/search'   },
+    ],
+  },
+  {
+    label: 'Analysis',
+    items: [
+      { icon: AlertTriangle,  label: 'Issues',         to: '/issues'   },
+      { icon: FileText,       label: 'Reports',        to: '/reports'  },
+    ],
+  },
+  {
+    label: 'Management',
+    items: [
+      { icon: UploadCloud,    label: 'Upload Stock',   to: '/upload'   },
+      { icon: Settings,       label: 'Settings',       to: '/settings' },
+    ],
+  },
 ];
 
-const mobileNavItems = navItems.slice(0, 5);
+const mobileNavItems = [
+  { icon: LayoutDashboard, label: 'Dashboard', to: '/' },
+  { icon: PackageSearch,   label: 'Count',     to: '/brands' },
+  { icon: AlertTriangle,   label: 'Issues',    to: '/issues' },
+  { icon: FileText,        label: 'Reports',   to: '/reports' },
+  { icon: UploadCloud,     label: 'Upload',    to: '/upload' },
+];
 
 function isActive(pathname: string, to: string) {
   return to === '/' ? pathname === '/' : pathname.startsWith(to);
 }
 
+const pageTitles: Record<string, string> = {
+  '/':         'Dashboard',
+  '/brands':   'Brand-Wise Counting',
+  '/sessions': 'Audit Sessions',
+  '/search':   'Search Stock',
+  '/issues':   'Issues & Discrepancies',
+  '/reports':  'Reports',
+  '/upload':   'Upload Stock',
+  '/settings': 'Settings',
+};
+
 export function AppLayout() {
   const { signOut, user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const { filename } = useStockStore();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  const handleLogout = async () => {
-    await signOut();
-    navigate('/login');
-  };
+  const handleLogout = async () => { await signOut(); navigate('/login'); };
+
+  const pageTitle = Object.entries(pageTitles).find(([path]) =>
+    path === '/' ? location.pathname === '/' : location.pathname.startsWith(path)
+  )?.[1] || 'StockSync';
 
   return (
-    <div style={{ display: 'flex', height: '100dvh', overflow: 'hidden', background: '#f8fafc' }}>
+    <div style={{ display: 'flex', height: '100dvh', overflow: 'hidden', fontFamily: "'Inter', -apple-system, sans-serif" }}>
 
       {/* ── Desktop Sidebar ── */}
-      <aside style={{
-        width: 240, flexShrink: 0, display: 'flex', flexDirection: 'column',
-        borderRight: '1px solid #e2e8f0', background: '#ffffff',
-        position: 'relative', zIndex: 10,
-      }}
-        className="hidden-mobile"
-      >
-        {/* Logo */}
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: 10, padding: '0 20px',
-          height: 64, borderBottom: '1px solid #e2e8f0', flexShrink: 0,
-        }}>
-          <div style={{
-            width: 32, height: 32, borderRadius: 8, background: '#4f46e5',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-          }}>
-            <PackageSearch size={16} color="#fff" />
-          </div>
-          <div>
-            <p style={{ fontWeight: 700, fontSize: 13, color: '#0f172a', lineHeight: 1 }}>StockSync</p>
-            <p style={{ fontSize: 10, color: '#94a3b8', marginTop: 2 }}>Reconciliation</p>
+      <aside style={{ width: 248, flexShrink: 0, display: 'flex', flexDirection: 'column', background: '#fff', borderRight: '1px solid #e8ecf0' }}
+        className="desktop-sidebar">
+
+        {/* Sidebar logo */}
+        <div style={{ padding: '20px 20px 16px', borderBottom: '1px solid #f1f5f9' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ width: 36, height: 36, borderRadius: 10, background: 'linear-gradient(135deg, #4f46e5, #7c3aed)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: '0 2px 8px rgba(79,70,229,0.3)' }}>
+              <PackageSearch size={18} color="#fff" />
+            </div>
+            <div>
+              <p style={{ fontSize: 13, fontWeight: 800, color: '#0f172a', margin: 0, letterSpacing: '-0.2px' }}>STOCKSYNC</p>
+              <p style={{ fontSize: 10, color: '#94a3b8', margin: '1px 0 0' }}>Reconciliation System</p>
+            </div>
           </div>
         </div>
 
-        {/* Nav Items */}
-        <nav style={{ flex: 1, overflowY: 'auto', padding: '16px 12px' }}>
-          <p style={{ fontSize: 10, fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', padding: '0 8px', marginBottom: 8 }}>
-            Navigation
-          </p>
-          {navItems.map(({ icon: Icon, label, to }) => {
-            const active = isActive(location.pathname, to);
-            return (
-              <NavLink
-                key={to} to={to}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px',
-                  borderRadius: 8, textDecoration: 'none', fontSize: 13, fontWeight: 500,
-                  color: active ? '#4f46e5' : '#475569',
-                  background: active ? '#eef2ff' : 'transparent',
-                  marginBottom: 2, transition: 'background 0.15s',
-                }}
-                onMouseEnter={e => { if (!active) (e.currentTarget as HTMLElement).style.background = '#f1f5f9'; }}
-                onMouseLeave={e => { if (!active) (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
-              >
-                <Icon size={15} color={active ? '#4f46e5' : '#94a3b8'} style={{ flexShrink: 0 }} />
-                {label}
-              </NavLink>
-            );
-          })}
-        </nav>
-
-        {/* User + Logout */}
-        <div style={{ borderTop: '1px solid #e2e8f0', padding: 16, flexShrink: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-            <div style={{
-              width: 32, height: 32, borderRadius: '50%', background: '#eef2ff',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontWeight: 700, fontSize: 13, color: '#4f46e5', flexShrink: 0,
-            }}>
-              {user?.email?.[0]?.toUpperCase() || 'A'}
-            </div>
-            <div style={{ minWidth: 0 }}>
-              <p style={{ fontSize: 12, fontWeight: 600, color: '#1e293b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {user?.email || 'Admin'}
+        {/* Nav groups */}
+        <nav style={{ flex: 1, overflowY: 'auto', padding: '12px 12px' }}>
+          {navGroups.map(group => (
+            <div key={group.label} style={{ marginBottom: 4 }}>
+              <p style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.09em', padding: '8px 8px 4px', margin: 0 }}>
+                {group.label}
               </p>
-              <p style={{ fontSize: 10, color: '#10b981', fontWeight: 500, display: 'flex', alignItems: 'center', gap: 4 }}>
-                <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#10b981', display: 'inline-block' }} />
-                Active
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={handleLogout}
-            style={{
-              width: '100%', display: 'flex', alignItems: 'center', gap: 8,
-              padding: '8px 12px', border: 'none', background: 'transparent',
-              borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 500, color: '#64748b',
-              transition: 'background 0.15s',
-            }}
-            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = '#fef2f2'; (e.currentTarget as HTMLElement).style.color = '#ef4444'; }}
-            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.color = '#64748b'; }}
-          >
-            <LogOut size={15} /> Sign Out
-          </button>
-        </div>
-      </aside>
-
-      {/* ── Mobile Sidebar Overlay ── */}
-      {mobileMenuOpen && (
-        <div
-          style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex' }}
-          onClick={() => setMobileMenuOpen(false)}
-        >
-          <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.3)' }} />
-          <aside
-            style={{
-              position: 'relative', width: 260, background: '#fff',
-              display: 'flex', flexDirection: 'column', zIndex: 51,
-            }}
-            onClick={e => e.stopPropagation()}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 16px', height: 56, borderBottom: '1px solid #e2e8f0' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <div style={{ width: 28, height: 28, borderRadius: 6, background: '#4f46e5', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <PackageSearch size={14} color="#fff" />
-                </div>
-                <span style={{ fontWeight: 700, fontSize: 13, color: '#0f172a' }}>StockSync</span>
-              </div>
-              <button onClick={() => setMobileMenuOpen(false)} style={{ border: 'none', background: 'none', cursor: 'pointer', padding: 4 }}>
-                <X size={18} color="#64748b" />
-              </button>
-            </div>
-            <nav style={{ flex: 1, overflowY: 'auto', padding: '12px 10px' }}>
-              {navItems.map(({ icon: Icon, label, to }) => {
+              {group.items.map(({ icon: Icon, label, to }) => {
                 const active = isActive(location.pathname, to);
                 return (
                   <NavLink
                     key={to} to={to}
-                    onClick={() => setMobileMenuOpen(false)}
                     style={{
-                      display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px',
-                      borderRadius: 8, textDecoration: 'none', fontSize: 14, fontWeight: 500,
-                      color: active ? '#4f46e5' : '#475569', background: active ? '#eef2ff' : 'transparent',
-                      marginBottom: 2,
+                      display: 'flex', alignItems: 'center', gap: 9, padding: '8px 10px',
+                      borderRadius: 8, textDecoration: 'none', fontSize: 13, fontWeight: active ? 600 : 500,
+                      color: active ? '#4f46e5' : '#475569',
+                      background: active ? '#eef2ff' : 'transparent',
+                      marginBottom: 1,
                     }}
+                    onMouseEnter={e => { if (!active) (e.currentTarget as HTMLElement).style.background = '#f8fafc'; }}
+                    onMouseLeave={e => { if (!active) (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
                   >
-                    <Icon size={16} color={active ? '#4f46e5' : '#94a3b8'} />
+                    <Icon size={15} color={active ? '#4f46e5' : '#94a3b8'} style={{ flexShrink: 0 }} />
                     {label}
                   </NavLink>
                 );
               })}
+            </div>
+          ))}
+        </nav>
+
+        {/* User */}
+        <div style={{ borderTop: '1px solid #f1f5f9', padding: '12px 12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '8px 10px', borderRadius: 8, background: '#f8fafc', marginBottom: 6 }}>
+            <div style={{ width: 30, height: 30, borderRadius: '50%', background: 'linear-gradient(135deg, #4f46e5, #7c3aed)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: 12, flexShrink: 0 }}>
+              {user?.email?.[0]?.toUpperCase() || 'A'}
+            </div>
+            <div style={{ minWidth: 0 }}>
+              <p style={{ fontSize: 12, fontWeight: 600, color: '#1e293b', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user?.email || 'Admin'}</p>
+              <p style={{ fontSize: 10, color: '#10b981', margin: '1px 0 0', display: 'flex', alignItems: 'center', gap: 4, fontWeight: 500 }}>
+                <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#10b981', display: 'inline-block' }} />Active
+              </p>
+            </div>
+          </div>
+          <button onClick={handleLogout}
+            style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', border: 'none', background: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 500, color: '#64748b', fontFamily: 'inherit' }}
+            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = '#fef2f2'; (e.currentTarget as HTMLElement).style.color = '#dc2626'; }}
+            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'none'; (e.currentTarget as HTMLElement).style.color = '#64748b'; }}
+          >
+            <LogOut size={14} /> Sign Out
+          </button>
+        </div>
+      </aside>
+
+      {/* ── Mobile slide-in sidebar ── */}
+      {mobileMenuOpen && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 50 }} onClick={() => setMobileMenuOpen(false)}>
+          <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.4)' }} />
+          <aside style={{ position: 'absolute', top: 0, left: 0, bottom: 0, width: 260, background: '#fff', display: 'flex', flexDirection: 'column', zIndex: 51, overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 16px', borderBottom: '1px solid #f1f5f9' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{ width: 30, height: 30, borderRadius: 8, background: 'linear-gradient(135deg, #4f46e5, #7c3aed)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <PackageSearch size={14} color="#fff" />
+                </div>
+                <span style={{ fontSize: 13, fontWeight: 800, color: '#0f172a' }}>STOCKSYNC</span>
+              </div>
+              <button onClick={() => setMobileMenuOpen(false)} style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#64748b', display: 'flex' }}><X size={20} /></button>
+            </div>
+            <nav style={{ flex: 1, padding: '12px' }}>
+              {navGroups.map(group => (
+                <div key={group.label} style={{ marginBottom: 4 }}>
+                  <p style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.09em', padding: '8px 8px 4px', margin: 0 }}>{group.label}</p>
+                  {group.items.map(({ icon: Icon, label, to }) => {
+                    const active = isActive(location.pathname, to);
+                    return (
+                      <NavLink key={to} to={to} onClick={() => setMobileMenuOpen(false)}
+                        style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '9px 10px', borderRadius: 8, textDecoration: 'none', fontSize: 14, fontWeight: active ? 600 : 500, color: active ? '#4f46e5' : '#475569', background: active ? '#eef2ff' : 'transparent', marginBottom: 1 }}>
+                        <Icon size={16} color={active ? '#4f46e5' : '#94a3b8'} />
+                        {label}
+                      </NavLink>
+                    );
+                  })}
+                </div>
+              ))}
             </nav>
           </aside>
         </div>
       )}
 
-      {/* ── Main Content ── */}
+      {/* ── Main Area ── */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, overflow: 'hidden' }}>
 
-        {/* Mobile Top Bar */}
-        <header style={{
-          display: 'none', // controlled via CSS class below
-          height: 56, borderBottom: '1px solid #e2e8f0', background: '#fff',
-          alignItems: 'center', justifyContent: 'space-between', padding: '0 16px',
-          flexShrink: 0,
-        }}
-          className="mobile-header"
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <button
-              onClick={() => setMobileMenuOpen(true)}
-              style={{ border: 'none', background: 'none', cursor: 'pointer', padding: 4, marginRight: 4 }}
-            >
-              <Menu size={20} color="#475569" />
+        {/* Dark Top Bar */}
+        <header style={{ height: 56, background: '#0f172a', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 24px', flexShrink: 0, gap: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            {/* Mobile hamburger */}
+            <button onClick={() => setMobileMenuOpen(true)} style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#94a3b8', display: 'flex', padding: 4 }} className="mobile-menu-btn">
+              <Menu size={20} />
             </button>
-            <div style={{ width: 26, height: 26, borderRadius: 6, background: '#4f46e5', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <PackageSearch size={13} color="#fff" />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }} className="topbar-logo">
+              <div style={{ width: 28, height: 28, borderRadius: 7, background: 'linear-gradient(135deg, #4f46e5, #7c3aed)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <PackageSearch size={14} color="#fff" />
+              </div>
+              <span style={{ fontSize: 13, fontWeight: 800, color: '#fff', letterSpacing: '-0.2px' }}>STOCKSYNC</span>
             </div>
-            <span style={{ fontWeight: 700, fontSize: 13, color: '#0f172a' }}>StockSync</span>
+            <ChevronRight size={14} color="#334155" />
+            <span style={{ fontSize: 14, fontWeight: 600, color: '#cbd5e1' }}>{pageTitle}</span>
           </div>
-          <button onClick={handleLogout} style={{ border: 'none', background: 'none', cursor: 'pointer', padding: 6 }}>
-            <LogOut size={18} color="#94a3b8" />
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            {filename && <span style={{ fontSize: 11, color: '#475569', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} className="filename-badge">{filename}</span>}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{ textAlign: 'right' }} className="user-text">
+                <p style={{ fontSize: 12, fontWeight: 600, color: '#f1f5f9', margin: 0 }}>{user?.email?.split('@')[0] || 'Admin'}</p>
+                <p style={{ fontSize: 10, color: '#475569', margin: 0 }}>Administrator</p>
+              </div>
+              <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'linear-gradient(135deg, #4f46e5, #7c3aed)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: 13, flexShrink: 0 }}>
+                {user?.email?.[0]?.toUpperCase() || 'A'}
+              </div>
+            </div>
+          </div>
         </header>
 
-        {/* Page Scroll Area */}
-        <main style={{ flex: 1, overflowY: 'auto' }}>
-          <div style={{ maxWidth: 1100, margin: '0 auto', padding: '24px 24px 80px' }} className="main-padding">
+        {/* Page content */}
+        <main style={{ flex: 1, overflowY: 'auto', background: '#f1f5f9' }}>
+          <div style={{ maxWidth: 1200, margin: '0 auto', padding: '28px 28px 80px' }} className="main-content">
             <AnimatePresence mode="wait">
               <motion.div
                 key={location.pathname}
-                initial={{ opacity: 0, y: 8 }}
+                initial={{ opacity: 0, y: 6 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0 }}
-                transition={{ duration: 0.16 }}
+                transition={{ duration: 0.15 }}
               >
                 <Outlet />
               </motion.div>
@@ -221,27 +234,13 @@ export function AppLayout() {
           </div>
         </main>
 
-        {/* Mobile Bottom Nav */}
-        <nav style={{
-          display: 'none', // controlled via CSS below
-          position: 'fixed', bottom: 0, left: 0, right: 0,
-          background: '#fff', borderTop: '1px solid #e2e8f0',
-          justifyContent: 'space-around', padding: '6px 0 8px',
-          zIndex: 40,
-        }}
-          className="mobile-bottom-nav"
-        >
+        {/* Mobile bottom nav */}
+        <nav style={{ position: 'fixed', bottom: 0, left: 0, right: 0, background: '#fff', borderTop: '1px solid #e8ecf0', display: 'flex', justifyContent: 'space-around', padding: '6px 0 10px', zIndex: 40 }} className="mobile-bottom-nav">
           {mobileNavItems.map(({ icon: Icon, label, to }) => {
             const active = isActive(location.pathname, to);
             return (
-              <NavLink
-                key={to} to={to}
-                style={{
-                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
-                  padding: '4px 12px', textDecoration: 'none',
-                  color: active ? '#4f46e5' : '#94a3b8', fontSize: 10, fontWeight: 500,
-                }}
-              >
+              <NavLink key={to} to={to}
+                style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, padding: '4px 10px', textDecoration: 'none', color: active ? '#4f46e5' : '#94a3b8', fontSize: 10, fontWeight: 500 }}>
                 <Icon size={20} color={active ? '#4f46e5' : '#94a3b8'} />
                 {label}
               </NavLink>
@@ -252,15 +251,18 @@ export function AppLayout() {
 
       <style>{`
         @media (min-width: 1024px) {
-          .hidden-mobile { display: flex !important; flex-direction: column !important; }
-          .mobile-header { display: none !important; }
+          .desktop-sidebar { display: flex !important; }
+          .mobile-menu-btn { display: none !important; }
           .mobile-bottom-nav { display: none !important; }
-          .main-padding { padding: 24px 32px 24px !important; }
+          .topbar-logo { display: none !important; }
+          .main-content { padding: 28px 32px 28px !important; }
         }
         @media (max-width: 1023px) {
-          .hidden-mobile { display: none !important; }
-          .mobile-header { display: flex !important; }
-          .mobile-bottom-nav { display: flex !important; }
+          .desktop-sidebar { display: none !important; }
+          .mobile-menu-btn { display: flex !important; }
+          .filename-badge { display: none !important; }
+          .user-text { display: none !important; }
+          .main-content { padding: 20px 16px 80px !important; }
         }
       `}</style>
     </div>
