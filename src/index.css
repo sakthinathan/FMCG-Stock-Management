@@ -33,28 +33,96 @@
   --radius: 0.625rem;
 }
 
-/* Override dark class to stay in light mode */
+/* Define dark theme colors and apply global overrides for inline styles */
 .dark {
-  --background: #f8fafc;
-  --foreground: #0f172a;
-  --card: #ffffff;
-  --card-foreground: #0f172a;
-  --popover: #ffffff;
-  --popover-foreground: #0f172a;
-  --primary: #4f46e5;
+  --background: #0b0f19;
+  --foreground: #f8fafc;
+  --card: #151e2e;
+  --card-foreground: #cbd5e1;
+  --popover: #151e2e;
+  --popover-foreground: #f8fafc;
+  --primary: #6366f1;
   --primary-foreground: #ffffff;
-  --secondary: #f1f5f9;
-  --secondary-foreground: #334155;
-  --muted: #f1f5f9;
-  --muted-foreground: #64748b;
-  --accent: #f1f5f9;
-  --accent-foreground: #334155;
+  --secondary: #151e2e;
+  --secondary-foreground: #cbd5e1;
+  --muted: #151e2e;
+  --muted-foreground: #94a3b8;
+  --accent: #151e2e;
+  --accent-foreground: #cbd5e1;
   --destructive: #ef4444;
   --destructive-foreground: #ffffff;
-  --border: #e2e8f0;
-  --input: #e2e8f0;
-  --ring: #4f46e5;
+  --border: #243049;
+  --input: #243049;
+  --ring: #6366f1;
 }
+
+/* Global overrides for dark mode inline styles */
+.dark body {
+  background-color: var(--background) !important;
+  color: var(--foreground) !important;
+}
+
+.dark aside,
+.dark .desktop-sidebar,
+.dark .skus-list-panel,
+.dark .stock-count-layout div[style*="background: #fff"] {
+  background-color: var(--card) !important;
+  border-color: var(--border) !important;
+}
+
+.dark [style*="background: #fff"],
+.dark [style*="background: #ffffff"],
+.dark [style*="background: rgb(255, 255, 255)"],
+.dark [style*="background-color: #fff"],
+.dark [style*="background-color: #ffffff"] {
+  background-color: var(--card) !important;
+  color: var(--foreground) !important;
+}
+
+.dark [style*="background: #f8fafc"],
+.dark [style*="background: #f1f5f9"],
+.dark [style*="background: rgb(248, 250, 252)"],
+.dark [style*="background: rgb(241, 245, 249)"] {
+  background-color: var(--background) !important;
+}
+
+.dark [style*="color: #0f172a"],
+.dark [style*="color: rgb(15, 23, 42)"] {
+  color: var(--foreground) !important;
+}
+
+.dark [style*="color: #64748b"],
+.dark [style*="color: #94a3b8"],
+.dark [style*="color: rgb(100, 116, 139)"],
+.dark [style*="color: rgb(148, 163, 184)"] {
+  color: var(--muted-foreground) !important;
+}
+
+.dark [style*="border: 1px solid #e2e8f0"],
+.dark [style*="border:1px solid #e2e8f0"],
+.dark [style*="border-bottom: 1px solid #f1f5f9"],
+.dark [style*="border-bottom:1px solid #f1f5f9"] {
+  border-color: var(--border) !important;
+}
+
+.dark input,
+.dark select,
+.dark textarea {
+  background-color: var(--background) !important;
+  color: var(--foreground) !important;
+  border-color: var(--border) !important;
+}
+
+.dark input::placeholder,
+.dark textarea::placeholder {
+  color: var(--muted-foreground) !important;
+}
+
+.dark .mobile-list-toggle-btn {
+  background-color: var(--card) !important;
+  border-color: var(--border) !important;
+}
+
 
 @theme inline {
   --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
