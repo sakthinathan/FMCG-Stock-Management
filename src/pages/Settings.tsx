@@ -110,6 +110,40 @@ export function Settings() {
             </div>
           </div>
         </div>
+
+        {/* Security & Data Storage */}
+        <div style={W}>
+          <div style={{ padding: '18px 22px', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ width: 34, height: 34, borderRadius: 9, background: '#eff6ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Shield size={16} color="#3b82f6" />
+            </div>
+            <div>
+              <h2 style={{ fontSize: 14, fontWeight: 700, color: '#0f172a', margin: 0 }}>Security & Data Storage</h2>
+              <p style={{ fontSize: 12, color: '#64748b', margin: '1px 0 0' }}>Data isolation and safety compliance</p>
+            </div>
+          </div>
+          <div style={{ padding: '18px 22px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div>
+              <p style={{ fontSize: 11, fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 4px' }}>Tenant Isolation Level</p>
+              <p style={{ fontSize: 12, color: '#334155', margin: 0 }}>
+                Row-Level Security (RLS) enforced at database level. Your agency data is physically isolated and inaccessible by other organizations.
+              </p>
+            </div>
+            <div>
+              <p style={{ fontSize: 11, fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 4px' }}>Storage Encryption</p>
+              <p style={{ fontSize: 12, color: '#334155', margin: 0 }}>
+                Encrypted at rest using AES-256 standard and in transit via HTTPS/TLS 1.3 tunnels on secure Supabase cloud hosting.
+              </p>
+            </div>
+            <div>
+              <p style={{ fontSize: 11, fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 4px' }}>Audit Logging</p>
+              <p style={{ fontSize: 12, color: '#334155', margin: 0 }}>
+                All stock counts record user metadata (Auditor ID, session timestamps, and discrepancy reason codes) for compliance tracking.
+              </p>
+            </div>
+          </div>
+        </div>
+
       </div>
 
       {/* Danger Zone */}
