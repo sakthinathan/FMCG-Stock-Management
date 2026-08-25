@@ -1,23 +1,27 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Loader2, PlayCircle, CheckCircle2, PauseCircle, ListChecks, ArrowRight, Building2 } from 'lucide-react';
+import { Loader2, CheckCircle2, PauseCircle, PlayCircle, ListChecks, ArrowRight, Building2 } from 'lucide-react';
 import { useStockStore } from '@/store/useStockStore';
 import { supabase } from '@/lib/supabase';
-import { motion } from 'framer-motion';
-import { cn } from '@/lib/utils';
 
 interface SessionRow {
-  id: string;
-  brand: string;
-  session_name: string;
-  count_date: string;
-  status: 'Not Started' | 'In Progress' | 'Completed';
-  total_counted: number;
-  total_products: number;
-  progress: number;
+  id: string; brand: string; session_name: string; count_date: string;
+  status: string; total_counted: number; total_products: number; progress: number;
+}
+
+const card: React.CSSProperties = { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, boxShadow: '0 1px 3px rgba(0,0,0,0.06)' };
+
+function StatusBadge({ status }: { status: string }) {
+  const cfg = status === 'Completed'
+    ? { bg: '#f0fdf4', color: '#16a34a', border: '#bbf7d0', label: '✓ Completed' }
+    : status === 'In Progress'
+    ? { bg: '#eef2ff', color: '#4f46e5', border: '#c7d2fe', label: '⏸ In Progress' }
+    : { bg: '#f8fafc', color: '#64748b', border: '#e2e8f0', label: 'Not Started' };
+  return (
+    <span style={{ fontSize: 11, fontWeight: 600, padding: '3px 8px', borderRadius: 9999, background: cfg.bg, color: cfg.color, border: `1px solid ${cfg.border}` }}>
+      {cfg.label}
+    </span>
+  );
 }
 
 export function Sessions() {
@@ -27,224 +31,113 @@ export function Sessions() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    async function loadSessions() {
-      if (!activeUploadId) {
-        setLoading(false);
-        return;
-      }
-
+    async function load() {
+      if (!activeUploadId) { setLoading(false); return; }
       try {
-        const { data: sessionData, error: sessError } = await supabase
-          .from('stock_count_sessions')
-          .select('*')
-          .eq('upload_id', activeUploadId)
-          .order('count_date', { ascending: false });
-        
-        if (sessError) throw sessError;
-
-        const { data: countsData, error: countError } = await supabase
-          .from('physical_stock_counts')
-          .select('session_id');
-        
-        if (countError) throw countError;
+        const { data: sessData } = await supabase.from('stock_count_sessions').select('*').eq('upload_id', activeUploadId).order('count_date', { ascending: false });
+        const { data: countsData } = await supabase.from('physical_stock_counts').select('session_id');
+        const { data: snapData } = await supabase.from('system_stock_snapshots').select('brand').eq('upload_id', activeUploadId);
 
         const countMap = new Map<string, number>();
-        countsData?.forEach(row => {
-          countMap.set(row.session_id, (countMap.get(row.session_id) || 0) + 1);
-        });
-
-        const { data: snapshotData, error: snapError } = await supabase
-          .from('system_stock_snapshots')
-          .select('brand')
-          .eq('upload_id', activeUploadId);
-
-        if (snapError) throw snapError;
-
+        countsData?.forEach(r => countMap.set(r.session_id, (countMap.get(r.session_id) || 0) + 1));
         const brandTotalMap = new Map<string, number>();
-        snapshotData?.forEach(row => {
-          brandTotalMap.set(row.brand, (brandTotalMap.get(row.brand) || 0) + 1);
-        });
+        snapData?.forEach(r => brandTotalMap.set(r.brand, (brandTotalMap.get(r.brand) || 0) + 1));
 
-        const rows: SessionRow[] = sessionData?.map(s => {
-          const totalProducts = brandTotalMap.get(s.brand) || 0;
-          const totalCounted = countMap.get(s.id) || 0;
-          const progress = totalProducts > 0 ? Math.round((totalCounted / totalProducts) * 100) : 0;
-          
+        const rows: SessionRow[] = (sessData || []).map(s => {
+          const total = brandTotalMap.get(s.brand) || 0;
+          const counted = countMap.get(s.id) || 0;
+          const progress = total > 0 ? Math.min(Math.round((counted / total) * 100), 100) : 0;
           let status = s.status;
-          if (progress >= 100) status = 'Completed';
-          else if (progress > 0) status = 'In Progress';
-
-          return {
-            id: s.id,
-            brand: s.brand,
-            session_name: s.session_name || `Count - ${s.brand}`,
-            count_date: new Date(s.count_date).toLocaleDateString(),
-            status,
-            total_counted: totalCounted,
-            total_products: totalProducts,
-            progress: Math.min(progress, 100)
-          };
-        }) || [];
-
+          if (progress >= 100) status = 'Completed'; else if (progress > 0) status = 'In Progress';
+          return { id: s.id, brand: s.brand, session_name: s.session_name || `Count - ${s.brand}`, count_date: new Date(s.count_date).toLocaleDateString(), status, total_counted: counted, total_products: total, progress };
+        });
         setSessions(rows);
-      } catch (error) {
-        console.error("Failed to load sessions:", error);
-      } finally {
-        setLoading(false);
-      }
+      } catch (e) { console.error(e); }
+      finally { setLoading(false); }
     }
-
-    loadSessions();
-
-    const channel = supabase
-      .channel('public:physical_stock_counts:sessions')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'physical_stock_counts' }, () => {
-        loadSessions();
-      })
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    load();
+    const ch = supabase.channel('sessions').on('postgres_changes', { event: '*', schema: 'public', table: 'physical_stock_counts' }, load).subscribe();
+    return () => { supabase.removeChannel(ch); };
   }, [activeUploadId]);
 
-  const getStatusBadge = (status: string) => {
-    if (status === 'Completed') {
-      return (
-        <Badge variant="default" className="bg-emerald-500/20 text-emerald-300 border-emerald-500/30 font-bold gap-1 text-[11px]">
-          <CheckCircle2 className="h-3 w-3 text-emerald-400" />
-          Completed
-        </Badge>
-      );
-    }
-    if (status === 'In Progress') {
-      return (
-        <Badge variant="secondary" className="bg-indigo-500/20 text-indigo-300 border-indigo-500/30 font-bold gap-1 text-[11px]">
-          <PauseCircle className="h-3 w-3 text-indigo-400" />
-          In Progress
-        </Badge>
-      );
-    }
-    return (
-      <Badge variant="outline" className="bg-secondary text-muted-foreground border-border font-bold text-[11px]">
-        Not Started
-      </Badge>
-    );
-  };
+  if (loading) return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 240 }}><Loader2 size={30} color="#4f46e5" style={{ animation: 'spin 1s linear infinite' }} /></div>;
 
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center h-[60vh]">
-        <Loader2 className="h-10 w-10 animate-spin text-indigo-500" />
+  if (!activeUploadId || sessions.length === 0) return (
+    <div style={{ ...card, maxWidth: 480, margin: '80px auto', padding: '48px 32px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
+      <div style={{ width: 52, height: 52, borderRadius: 12, background: '#eef2ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <ListChecks size={24} color="#4f46e5" />
       </div>
-    );
-  }
-
-  if (!activeUploadId || sessions.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center h-[65vh] text-center space-y-4 p-8 bg-card border border-border shadow-sm rounded-xl rounded-3xl max-w-lg mx-auto border-border text-muted-foreground">
-        <div className="bg-indigo-500/10 p-4 rounded-2xl text-indigo-400">
-          <ListChecks className="h-12 w-12" />
-        </div>
-        <div>
-          <h3 className="text-xl font-bold text-foreground">No Sessions Created</h3>
-          <p className="text-xs text-muted-foreground mt-1 max-w-xs">Start a brand counting queue to automatically create audit sessions.</p>
-        </div>
-        <Button onClick={() => navigate('/brands')} className="rounded-xl font-bold bg-indigo-600 hover:bg-indigo-500 text-foreground">
-          Go to Brand Selection
-        </Button>
+      <div>
+        <h2 style={{ fontSize: 18, fontWeight: 700, color: '#0f172a', margin: 0 }}>No Sessions Yet</h2>
+        <p style={{ fontSize: 13, color: '#64748b', margin: '6px 0 0', maxWidth: 280 }}>Start a brand count to automatically create audit sessions</p>
       </div>
-    );
-  }
+      <button onClick={() => navigate('/brands')} style={{ padding: '9px 18px', borderRadius: 8, border: 'none', background: '#4f46e5', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+        Go to Brand Selection
+      </button>
+    </div>
+  );
 
   return (
-    <div className="space-y-6 pb-12">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
       {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-card  p-6 rounded-3xl border border-border shadow-sm">
-        <div>
-          <div className="flex items-center gap-2.5">
-            <div className="p-2 rounded-xl bg-indigo-500/10 text-indigo-400">
-              <ListChecks className="h-6 w-6" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-black tracking-tight text-foreground">Audit Sessions</h1>
-              <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">Manage, track, and resume brand-wise physical stock count sessions.</p>
-            </div>
+      <div style={{ ...card, padding: '18px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          <div style={{ width: 40, height: 40, borderRadius: 10, background: '#eef2ff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <ListChecks size={20} color="#4f46e5" />
+          </div>
+          <div>
+            <h1 style={{ fontSize: 20, fontWeight: 700, color: '#0f172a', margin: 0 }}>Audit Sessions</h1>
+            <p style={{ fontSize: 13, color: '#64748b', margin: '3px 0 0' }}>Track and resume brand-wise physical stock counts</p>
           </div>
         </div>
-
-        <Button 
-          onClick={() => navigate('/brands')} 
-          className="rounded-xl font-bold bg-indigo-600 hover:bg-indigo-500 text-foreground shadow-lg shadow-indigo-600/25 h-11 px-5"
-        >
-          <span>Start New Brand Count</span>
-          <ArrowRight className="ml-2 h-4 w-4" />
-        </Button>
+        <button onClick={() => navigate('/brands')} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 18px', borderRadius: 8, border: 'none', background: '#4f46e5', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+          New Count <ArrowRight size={14} />
+        </button>
       </div>
 
-      {/* Sessions Table Card */}
-      <Card className="bg-card border border-border shadow-sm rounded-xl border-border rounded-3xl overflow-hidden shadow-xl">
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead className="bg-card text-muted-foreground uppercase text-[11px] font-bold tracking-wider border-b border-border">
-                <tr>
-                  <th className="py-3.5 px-4 sm:px-6">Session & Date</th>
-                  <th className="py-3.5 px-4">Brand</th>
-                  <th className="py-3.5 px-4 text-center">Status</th>
-                  <th className="py-3.5 px-4 text-center">Progress</th>
-                  <th className="py-3.5 px-4 text-right">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800/60">
-                {sessions.map((session) => (
-                  <tr key={session.id} className="hover:bg-secondary/50 transition-colors">
-                    <td className="py-3.5 px-4 sm:px-6 font-bold text-foreground">
-                      {session.session_name}
-                      <div className="text-xs font-normal text-muted-foreground mt-0.5">Created: {session.count_date}</div>
-                    </td>
-                    <td className="py-3.5 px-4">
-                      <Badge variant="outline" className="bg-secondary/50 text-foreground border-border font-semibold text-xs">
-                        {session.brand}
-                      </Badge>
-                    </td>
-                    <td className="py-3.5 px-4 text-center">
-                      {getStatusBadge(session.status)}
-                    </td>
-                    <td className="py-3.5 px-4 text-center">
-                      <div className="inline-flex flex-col items-center">
-                        <span className="text-xs font-bold text-muted-foreground">
-                          {session.total_counted} / {session.total_products} ({session.progress}%)
-                        </span>
-                        <div className="w-20 h-1.5 bg-secondary rounded-full mt-1 overflow-hidden">
-                          <div 
-                            className={cn("h-full rounded-full transition-all", session.progress === 100 ? "bg-emerald-500" : "bg-indigo-500")}
-                            style={{ width: `${session.progress}%` }}
-                          />
-                        </div>
-                      </div>
-                    </td>
-                    <td className="py-3.5 px-4 text-right">
-                      <Button 
-                        size="sm"
-                        className={cn(
-                          "rounded-xl font-bold text-xs h-9 px-4 shadow-sm",
-                          session.status === 'Completed'
-                            ? 'border border-border bg-transparent text-muted-foreground hover:bg-secondary'
-                            : 'bg-indigo-600 hover:bg-indigo-500 text-foreground'
-                        )}
-                        onClick={() => navigate(`/count/${session.id}`)}
-                      >
-                        {session.status === 'Completed' ? 'Review Count' : 'Resume Count'}
-                      </Button>
-                    </td>
-                  </tr>
+      {/* Table */}
+      <div style={{ ...card, overflow: 'hidden' }}>
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+            <thead>
+              <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+                {['Session', 'Brand', 'Status', 'Progress', 'Action'].map((h, i) => (
+                  <th key={h} style={{ padding: '11px 16px', fontSize: 11, fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em', textAlign: i >= 2 ? 'center' : 'left' }}>{h}</th>
                 ))}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
+              </tr>
+            </thead>
+            <tbody>
+              {sessions.map(s => (
+                <tr key={s.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                  <td style={{ padding: '13px 16px' }}>
+                    <p style={{ fontWeight: 600, color: '#0f172a', margin: 0 }}>{s.session_name}</p>
+                    <p style={{ fontSize: 11, color: '#94a3b8', margin: '2px 0 0' }}>{s.count_date}</p>
+                  </td>
+                  <td style={{ padding: '13px 16px' }}>
+                    <span style={{ fontSize: 11, fontWeight: 600, background: '#f1f5f9', color: '#475569', padding: '3px 8px', borderRadius: 6, border: '1px solid #e2e8f0' }}>{s.brand}</span>
+                  </td>
+                  <td style={{ padding: '13px 16px', textAlign: 'center' }}><StatusBadge status={s.status} /></td>
+                  <td style={{ padding: '13px 16px', textAlign: 'center' }}>
+                    <p style={{ fontSize: 11, fontWeight: 600, color: '#64748b', margin: '0 0 4px' }}>{s.total_counted}/{s.total_products} ({s.progress}%)</p>
+                    <div style={{ width: 80, height: 4, background: '#f1f5f9', borderRadius: 9999, margin: '0 auto', overflow: 'hidden' }}>
+                      <div style={{ height: '100%', width: `${s.progress}%`, background: s.progress === 100 ? '#16a34a' : '#4f46e5', borderRadius: 9999 }} />
+                    </div>
+                  </td>
+                  <td style={{ padding: '13px 16px', textAlign: 'center' }}>
+                    <button
+                      onClick={() => navigate(`/count/${s.id}`)}
+                      style={{ padding: '6px 14px', borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: 'pointer', border: s.status === 'Completed' ? '1px solid #e2e8f0' : 'none', background: s.status === 'Completed' ? '#fff' : '#4f46e5', color: s.status === 'Completed' ? '#475569' : '#fff' }}
+                    >
+                      {s.status === 'Completed' ? 'Review' : 'Resume'}
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 }

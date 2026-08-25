@@ -1,225 +1,180 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import {
-  Package, AlertCircle, CheckCircle2, AlertTriangle,
-  Loader2, ArrowRight, Building2, UploadCloud
-} from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { Package, AlertCircle, CheckCircle2, AlertTriangle, Loader2, ArrowRight, Building2, UploadCloud } from 'lucide-react';
 import { useStockStore } from '@/store/useStockStore';
 import { supabase } from '@/lib/supabase';
+
+const card: React.CSSProperties = { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, boxShadow: '0 1px 3px rgba(0,0,0,0.06)' };
 
 export function Dashboard() {
   const navigate = useNavigate();
   const { activeUploadId, filename, uploadedAt } = useStockStore();
   const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState({
-    totalBrands: 0, totalProducts: 0, countedProducts: 0,
-    pendingProducts: 0, equalCount: 0, shortage: 0, excess: 0,
-  });
-  const [criticalIssues, setCriticalIssues] = useState<any[]>([]);
+  const [stats, setStats] = useState({ totalBrands: 0, totalProducts: 0, countedProducts: 0, pendingProducts: 0, equalCount: 0, shortage: 0, excess: 0 });
+  const [issues, setIssues] = useState<any[]>([]);
 
   useEffect(() => {
     async function fetch() {
       if (!activeUploadId) { setLoading(false); return; }
       try {
-        const { data: snapshots } = await supabase.from('system_stock_snapshots').select('*').eq('upload_id', activeUploadId);
+        const { data: snaps } = await supabase.from('system_stock_snapshots').select('*').eq('upload_id', activeUploadId);
         const { data: counts } = await supabase.from('physical_stock_counts').select('*, system_stock_snapshots!inner(upload_id)').eq('system_stock_snapshots.upload_id', activeUploadId);
-
-        const uniqueBrands = new Set(snapshots?.map(s => s.brand)).size;
-        const totalProducts = snapshots?.length || 0;
-        const countedProducts = counts?.length || 0;
-
-        let equalCount = 0, shortage = 0, excess = 0;
-        const issues: any[] = [];
-
+        const brands = new Set(snaps?.map(s => s.brand)).size;
+        const total = snaps?.length || 0;
+        const counted = counts?.length || 0;
+        let eq = 0, sh = 0, ex = 0;
+        const issueList: any[] = [];
         counts?.forEach(c => {
-          if (c.status === 'Equal') equalCount++;
-          else if (c.status === 'Shortage') shortage++;
-          else if (c.status === 'Excess') excess++;
-
+          if (c.status === 'Equal') eq++; else if (c.status === 'Shortage') sh++; else if (c.status === 'Excess') ex++;
           if (c.variance !== 0) {
-            const snap = snapshots?.find(s => s.id === c.snapshot_id);
-            if (snap) {
-              const varianceAbs = Math.abs(c.variance);
-              issues.push({
-                id: c.id, material: snap.material, desc: snap.material_desc,
-                brand: snap.brand, type: c.status,
-                variance: `${c.variance > 0 ? '+' : ''}${c.variance} PCS`,
-                impact: Math.round(varianceAbs * (snap.mrp || 0)), varianceAbs,
-              });
-            }
+            const snap = snaps?.find(s => s.id === c.snapshot_id);
+            if (snap) issueList.push({ id: c.id, material: snap.material, desc: snap.material_desc, brand: snap.brand, type: c.status, variance: c.variance, impact: Math.round(Math.abs(c.variance) * (snap.mrp || 0)) });
           }
         });
-
-        issues.sort((a, b) => b.varianceAbs - a.varianceAbs);
-        setStats({ totalBrands: uniqueBrands, totalProducts, countedProducts, pendingProducts: totalProducts - countedProducts, equalCount, shortage, excess });
-        setCriticalIssues(issues.slice(0, 6));
+        issueList.sort((a, b) => Math.abs(b.variance) - Math.abs(a.variance));
+        setStats({ totalBrands: brands, totalProducts: total, countedProducts: counted, pendingProducts: total - counted, equalCount: eq, shortage: sh, excess: ex });
+        setIssues(issueList.slice(0, 6));
       } catch (e) { console.error(e); }
       finally { setLoading(false); }
     }
-
     fetch();
-    const ch = supabase.channel('dashboard').on('postgres_changes', { event: '*', schema: 'public', table: 'physical_stock_counts' }, fetch).subscribe();
+    const ch = supabase.channel('dash').on('postgres_changes', { event: '*', schema: 'public', table: 'physical_stock_counts' }, fetch).subscribe();
     return () => { supabase.removeChannel(ch); };
   }, [activeUploadId]);
 
-  if (loading) return <div className="flex items-center justify-center h-64"><Loader2 className="w-8 h-8 animate-spin text-indigo-500" /></div>;
+  if (loading) return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 240 }}><Loader2 size={30} color="#4f46e5" style={{ animation: 'spin 1s linear infinite' }} /></div>;
 
   if (!activeUploadId) return (
-    <div className="flex flex-col items-center justify-center h-[60vh] text-center gap-5">
-      <div className="w-16 h-16 rounded-2xl bg-indigo-50 flex items-center justify-center">
-        <UploadCloud className="w-8 h-8 text-indigo-500" />
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60vh', textAlign: 'center', gap: 20 }}>
+      <div style={{ width: 64, height: 64, borderRadius: 16, background: '#eef2ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <UploadCloud size={30} color="#4f46e5" />
       </div>
       <div>
-        <h2 className="text-xl font-bold text-slate-900">No Active Session</h2>
-        <p className="text-sm text-slate-500 mt-1 max-w-xs">Upload an Excel stock master file to start reconciliation</p>
+        <h2 style={{ fontSize: 20, fontWeight: 700, color: '#0f172a', margin: 0 }}>No Active Session</h2>
+        <p style={{ fontSize: 13, color: '#64748b', margin: '6px 0 0' }}>Upload a stock Excel file to start reconciliation</p>
       </div>
-      <Button onClick={() => navigate('/upload')} className="bg-indigo-600 hover:bg-indigo-700 text-white">
-        <UploadCloud className="w-4 h-4 mr-2" /> Upload Stock File
-      </Button>
+      <button onClick={() => navigate('/upload')} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 20px', borderRadius: 8, border: 'none', background: '#4f46e5', color: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
+        <UploadCloud size={16} /> Upload Stock File
+      </button>
     </div>
   );
 
   const pct = stats.totalProducts > 0 ? Math.round((stats.countedProducts / stats.totalProducts) * 100) : 0;
 
   return (
-    <div className="space-y-5">
-      {/* Header */}
-      <div className="bg-white border border-[#e2e8f0] rounded-xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+
+      {/* Page Header */}
+      <div style={{ ...card, padding: '18px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
         <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-xl font-bold text-slate-900">Dashboard</h1>
-            <span className="px-2 py-0.5 text-[10px] font-semibold bg-indigo-50 text-indigo-600 border border-indigo-100 rounded-full">Live</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <h1 style={{ fontSize: 20, fontWeight: 700, color: '#0f172a', margin: 0 }}>Dashboard</h1>
+            <span style={{ fontSize: 10, fontWeight: 600, background: '#eef2ff', color: '#4338ca', padding: '2px 8px', borderRadius: 9999, border: '1px solid #c7d2fe' }}>Live</span>
           </div>
-          <p className="text-sm text-slate-500 mt-0.5">
-            <span className="font-medium text-slate-700">{filename}</span>
-            {uploadedAt && <> · {new Date(uploadedAt).toLocaleDateString()}</>}
+          <p style={{ fontSize: 13, color: '#64748b', margin: '4px 0 0' }}>
+            <strong style={{ color: '#334155' }}>{filename}</strong>{uploadedAt && ` · ${new Date(uploadedAt).toLocaleDateString()}`}
           </p>
         </div>
-        <Button onClick={() => navigate('/brands')} className="bg-indigo-600 hover:bg-indigo-700 text-white shrink-0">
-          Continue Count <ArrowRight className="w-4 h-4 ml-1.5" />
-        </Button>
+        <button onClick={() => navigate('/brands')} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 18px', borderRadius: 8, border: 'none', background: '#4f46e5', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+          Continue Count <ArrowRight size={14} />
+        </button>
       </div>
 
-      {/* Progress bar */}
-      <div className="bg-white border border-[#e2e8f0] rounded-xl p-4">
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-sm font-semibold text-slate-700">Overall Progress</span>
-          <span className="text-sm font-bold text-indigo-600">{pct}%</span>
+      {/* Progress */}
+      <div style={{ ...card, padding: '16px 24px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+          <span style={{ fontSize: 13, fontWeight: 600, color: '#334155' }}>Overall Progress</span>
+          <span style={{ fontSize: 14, fontWeight: 700, color: '#4f46e5' }}>{pct}%</span>
         </div>
-        <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-          <div className="h-full bg-indigo-500 rounded-full transition-all duration-500" style={{ width: `${pct}%` }} />
+        <div style={{ height: 8, background: '#f1f5f9', borderRadius: 9999, overflow: 'hidden' }}>
+          <div style={{ height: '100%', width: `${pct}%`, background: 'linear-gradient(90deg, #4f46e5, #7c3aed)', borderRadius: 9999, transition: 'width 0.5s ease' }} />
         </div>
-        <p className="text-xs text-slate-400 mt-1.5">{stats.countedProducts} of {stats.totalProducts} SKUs audited</p>
+        <p style={{ fontSize: 12, color: '#94a3b8', margin: '8px 0 0' }}>{stats.countedProducts} of {stats.totalProducts} SKUs audited</p>
       </div>
 
       {/* KPI Grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
         {[
-          { label: 'Total Brands',  value: stats.totalBrands,      sub: 'categories',       icon: Building2,     color: 'indigo' },
-          { label: 'Total SKUs',    value: stats.totalProducts,     sub: 'in master file',   icon: Package,       color: 'slate'  },
-          { label: 'Counted',       value: stats.countedProducts,   sub: 'SKUs audited',     icon: CheckCircle2,  color: 'emerald'},
-          { label: 'Pending',       value: stats.pendingProducts,   sub: 'awaiting count',   icon: AlertCircle,   color: 'amber'  },
-        ].map(({ label, value, sub, icon: Icon, color }) => (
-          <div key={label} className="bg-white border border-[#e2e8f0] rounded-xl p-4">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">{label}</span>
-              <div className={cn('w-8 h-8 rounded-lg flex items-center justify-center',
-                color === 'indigo'  ? 'bg-indigo-50'  :
-                color === 'emerald' ? 'bg-emerald-50' :
-                color === 'amber'   ? 'bg-amber-50'   : 'bg-slate-100'
-              )}>
-                <Icon className={cn('w-4 h-4',
-                  color === 'indigo'  ? 'text-indigo-500'  :
-                  color === 'emerald' ? 'text-emerald-500' :
-                  color === 'amber'   ? 'text-amber-500'   : 'text-slate-500'
-                )} />
-              </div>
-            </div>
-            <div className={cn('text-2xl font-bold',
-              color === 'emerald' ? 'text-emerald-600' :
-              color === 'amber'   ? 'text-amber-600'   : 'text-slate-900'
-            )}>{value}</div>
-            <p className="text-xs text-slate-400 mt-0.5">{sub}</p>
+          { label: 'Total Brands', value: stats.totalBrands, sub: 'categories', bg: '#eef2ff', color: '#4338ca', iconBg: '#c7d2fe' },
+          { label: 'Total SKUs', value: stats.totalProducts, sub: 'in master file', bg: '#fff', color: '#334155', iconBg: '#f1f5f9' },
+          { label: 'Counted', value: stats.countedProducts, sub: 'SKUs audited', bg: '#f0fdf4', color: '#15803d', iconBg: '#bbf7d0' },
+          { label: 'Pending', value: stats.pendingProducts, sub: 'awaiting count', bg: '#fffbeb', color: '#b45309', iconBg: '#fde68a' },
+        ].map(({ label, value, sub, bg, color, iconBg }) => (
+          <div key={label} style={{ background: bg, border: '1px solid #e2e8f0', borderRadius: 12, padding: '18px 20px' }}>
+            <p style={{ fontSize: 11, fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 10px' }}>{label}</p>
+            <p style={{ fontSize: 28, fontWeight: 700, color, margin: 0 }}>{value}</p>
+            <p style={{ fontSize: 12, color: '#94a3b8', margin: '4px 0 0' }}>{sub}</p>
           </div>
         ))}
       </div>
 
-      {/* Discrepancy Summary */}
-      <div className="grid grid-cols-3 gap-3">
-        <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-4">
-          <p className="text-xs font-semibold text-emerald-600 uppercase tracking-wide">Equal</p>
-          <div className="text-3xl font-bold text-emerald-700 mt-1">{stats.equalCount}</div>
-          <p className="text-xs text-emerald-500 mt-0.5 hidden sm:block">Exact match</p>
+      {/* Discrepancy Counts */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+        <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 12, padding: '16px 20px' }}>
+          <p style={{ fontSize: 11, fontWeight: 600, color: '#16a34a', textTransform: 'uppercase', letterSpacing: '0.06em', margin: 0 }}>Equal</p>
+          <p style={{ fontSize: 32, fontWeight: 700, color: '#15803d', margin: '6px 0 2px' }}>{stats.equalCount}</p>
+          <p style={{ fontSize: 11, color: '#4ade80', margin: 0 }}>Exact match</p>
         </div>
-        <div className="bg-red-50 border border-red-100 rounded-xl p-4">
-          <p className="text-xs font-semibold text-red-600 uppercase tracking-wide">Shortage</p>
-          <div className="text-3xl font-bold text-red-700 mt-1">{stats.shortage}</div>
-          <p className="text-xs text-red-500 mt-0.5 hidden sm:block">Physical &lt; System</p>
+        <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 12, padding: '16px 20px' }}>
+          <p style={{ fontSize: 11, fontWeight: 600, color: '#dc2626', textTransform: 'uppercase', letterSpacing: '0.06em', margin: 0 }}>Shortage</p>
+          <p style={{ fontSize: 32, fontWeight: 700, color: '#b91c1c', margin: '6px 0 2px' }}>{stats.shortage}</p>
+          <p style={{ fontSize: 11, color: '#f87171', margin: 0 }}>Physical &lt; System</p>
         </div>
-        <div className="bg-amber-50 border border-amber-100 rounded-xl p-4">
-          <p className="text-xs font-semibold text-amber-600 uppercase tracking-wide">Excess</p>
-          <div className="text-3xl font-bold text-amber-700 mt-1">{stats.excess}</div>
-          <p className="text-xs text-amber-500 mt-0.5 hidden sm:block">Physical &gt; System</p>
+        <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 12, padding: '16px 20px' }}>
+          <p style={{ fontSize: 11, fontWeight: 600, color: '#d97706', textTransform: 'uppercase', letterSpacing: '0.06em', margin: 0 }}>Excess</p>
+          <p style={{ fontSize: 32, fontWeight: 700, color: '#b45309', margin: '6px 0 2px' }}>{stats.excess}</p>
+          <p style={{ fontSize: 11, color: '#fbbf24', margin: 0 }}>Physical &gt; System</p>
         </div>
       </div>
 
-      {/* Top Issues Table */}
-      <div className="bg-white border border-[#e2e8f0] rounded-xl overflow-hidden">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-[#e2e8f0]">
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-red-50 flex items-center justify-center">
-              <AlertTriangle className="w-3.5 h-3.5 text-red-500" />
+      {/* Top Issues */}
+      <div style={{ ...card, overflow: 'hidden' }}>
+        <div style={{ padding: '14px 20px', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ width: 32, height: 32, borderRadius: 8, background: '#fef2f2', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <AlertTriangle size={15} color="#dc2626" />
             </div>
             <div>
-              <h2 className="text-sm font-bold text-slate-900">Top Discrepancies</h2>
-              <p className="text-[11px] text-slate-400">Largest variances by magnitude</p>
+              <p style={{ fontSize: 14, fontWeight: 700, color: '#0f172a', margin: 0 }}>Top Discrepancies</p>
+              <p style={{ fontSize: 11, color: '#94a3b8', margin: '1px 0 0' }}>Largest variances by magnitude</p>
             </div>
           </div>
-          <Button variant="ghost" size="sm" onClick={() => navigate('/issues')} className="text-indigo-600 hover:text-indigo-700 text-xs font-semibold">
-            View All <ArrowRight className="w-3.5 h-3.5 ml-1" />
-          </Button>
+          <button onClick={() => navigate('/issues')} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '6px 12px', borderRadius: 7, border: '1px solid #e2e8f0', background: '#fff', color: '#4f46e5', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+            View All <ArrowRight size={12} />
+          </button>
         </div>
 
-        {criticalIssues.length === 0 ? (
-          <div className="py-12 text-center">
-            <CheckCircle2 className="w-10 h-10 text-emerald-400 mx-auto mb-2" />
-            <p className="text-sm font-semibold text-slate-700">No Discrepancies</p>
-            <p className="text-xs text-slate-400 mt-0.5">All counted stock matches system records</p>
+        {issues.length === 0 ? (
+          <div style={{ padding: '48px 24px', textAlign: 'center' }}>
+            <CheckCircle2 size={36} color="#4ade80" style={{ margin: '0 auto 12px' }} />
+            <p style={{ fontWeight: 600, color: '#334155', margin: 0 }}>No Discrepancies Found</p>
+            <p style={{ fontSize: 12, color: '#94a3b8', margin: '4px 0 0' }}>All counted stock matches system records</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
               <thead>
-                <tr className="bg-slate-50 border-b border-[#e2e8f0]">
-                  <th className="text-left py-3 px-5 text-[11px] font-semibold text-slate-500 uppercase tracking-wide">Material</th>
-                  <th className="text-left py-3 px-4 text-[11px] font-semibold text-slate-500 uppercase tracking-wide">Brand</th>
-                  <th className="text-center py-3 px-4 text-[11px] font-semibold text-slate-500 uppercase tracking-wide">Status</th>
-                  <th className="text-right py-3 px-4 text-[11px] font-semibold text-slate-500 uppercase tracking-wide">Variance</th>
-                  <th className="text-right py-3 px-5 text-[11px] font-semibold text-slate-500 uppercase tracking-wide">Impact ₹</th>
+                <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+                  {['Material', 'Brand', 'Status', 'Variance', 'Impact ₹'].map((h, i) => (
+                    <th key={h} style={{ padding: '10px 16px', fontSize: 11, fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em', textAlign: i >= 2 ? 'center' : 'left' }}>{h}</th>
+                  ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#f1f5f9]">
-                {criticalIssues.map(issue => (
-                  <tr key={issue.id} className="hover:bg-slate-50 transition-colors">
-                    <td className="py-3.5 px-5">
-                      <p className="font-semibold text-slate-900 text-sm">{issue.material}</p>
-                      <p className="text-xs text-slate-400 truncate max-w-[200px]">{issue.desc}</p>
+              <tbody>
+                {issues.map(issue => (
+                  <tr key={issue.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                    <td style={{ padding: '12px 16px' }}>
+                      <p style={{ fontWeight: 600, color: '#0f172a', margin: 0 }}>{issue.material}</p>
+                      <p style={{ fontSize: 11, color: '#94a3b8', margin: '2px 0 0', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{issue.desc}</p>
                     </td>
-                    <td className="py-3.5 px-4 text-xs text-slate-500 font-medium">{issue.brand}</td>
-                    <td className="py-3.5 px-4 text-center">
-                      <span className={cn('px-2 py-0.5 rounded-full text-[10px] font-semibold',
-                        issue.type.includes('Shortage') ? 'bg-red-50 text-red-600' : 'bg-amber-50 text-amber-600'
-                      )}>{issue.type}</span>
+                    <td style={{ padding: '12px 16px', fontSize: 12, color: '#64748b', fontWeight: 500 }}>{issue.brand}</td>
+                    <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                      <span style={{ fontSize: 10, fontWeight: 600, padding: '3px 8px', borderRadius: 9999, background: issue.type === 'Shortage' ? '#fef2f2' : '#fffbeb', color: issue.type === 'Shortage' ? '#dc2626' : '#d97706' }}>{issue.type}</span>
                     </td>
-                    <td className={cn('py-3.5 px-4 text-right font-bold text-sm',
-                      issue.variance.startsWith('-') ? 'text-red-600' : 'text-amber-600'
-                    )}>{issue.variance}</td>
-                    <td className="py-3.5 px-5 text-right font-semibold text-slate-700 text-sm">
-                      ₹{issue.impact.toLocaleString('en-IN')}
+                    <td style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 700, color: issue.variance < 0 ? '#dc2626' : '#d97706', fontSize: 13 }}>
+                      {issue.variance > 0 ? '+' : ''}{issue.variance}
                     </td>
+                    <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 600, color: '#334155', fontSize: 13 }}>₹{issue.impact.toLocaleString('en-IN')}</td>
                   </tr>
                 ))}
               </tbody>
@@ -227,6 +182,7 @@ export function Dashboard() {
           </div>
         )}
       </div>
+      <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 }
