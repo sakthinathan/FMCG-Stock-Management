@@ -274,9 +274,9 @@ export function StockCount() {
         alert('Audit session completed!');
         navigate('/brands');
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
-      alert('Failed to save count.');
+      alert('Failed to save count: ' + (e.message || e.details || JSON.stringify(e)));
     } finally {
       setSaving(false);
     }
