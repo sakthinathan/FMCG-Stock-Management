@@ -473,16 +473,41 @@ export function StockCount() {
               <div style={{ background: '#f8fafc', borderRadius: 10, padding: 14, display: 'flex', flexDirection: 'column', gap: 10, border: '1px solid #f1f5f9' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span style={{ fontSize: 12, color: '#64748b', fontWeight: 500 }}>System Stock Target</span>
-                  <span style={{ fontSize: 13, fontWeight: 700, color: '#334155' }}>{currentProduct.system_qty_pcs} PCS</span>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: '#334155' }}>
+                    {Math.floor(currentProduct.system_qty_pcs / currentProduct.conversion)} CBB + {currentProduct.system_qty_pcs % currentProduct.conversion} PCS ({currentProduct.system_qty_pcs} PCS)
+                  </span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span style={{ fontSize: 12, color: '#64748b', fontWeight: 500 }}>Your Count Total</span>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     {saveStatus === 'saving' && <span style={{ fontSize: 10, color: '#4f46e5', fontWeight: 600 }}>Saving...</span>}
                     {saveStatus === 'saved' && <span style={{ fontSize: 10, color: '#10b981', fontWeight: 600 }}>Saved ✓</span>}
-                    <span style={{ fontSize: 14, fontWeight: 800, color: '#0f172a' }}>{totalPhysical} PCS</span>
+                    <span style={{ fontSize: 13, fontWeight: 800, color: '#0f172a' }}>
+                      {Math.floor(totalPhysical / currentProduct.conversion)} CBB + {totalPhysical % currentProduct.conversion} PCS ({totalPhysical} PCS)
+                    </span>
                   </div>
                 </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #f1f5f9', paddingTop: 8, marginTop: 2 }}>
+                  <span style={{ fontSize: 12, color: '#64748b', fontWeight: 500 }}>Previous Audit Variance</span>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: (currentProduct.prev_variance || 0) < 0 ? '#dc2626' : (currentProduct.prev_variance || 0) > 0 ? '#d97706' : '#16a34a' }}>
+                    {(currentProduct.prev_variance || 0) > 0 ? '+' : ''}{currentProduct.prev_variance || 0} PCS
+                  </span>
+                </div>
+
+                {hasInput && liveVariance !== null && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: 12, color: '#64748b', fontWeight: 500 }}>Count vs History</span>
+                    <span style={{
+                      fontSize: 12, fontWeight: 700,
+                      color: liveVariance === (currentProduct.prev_variance || 0) ? '#16a34a' : '#4f46e5'
+                    }}>
+                      {liveVariance === (currentProduct.prev_variance || 0)
+                        ? 'Matches Previous Variance ✓'
+                        : `Variance Changed (Delta: ${liveVariance - (currentProduct.prev_variance || 0) > 0 ? '+' : ''}${liveVariance - (currentProduct.prev_variance || 0)} PCS)`}
+                    </span>
+                  </div>
+                )}
 
                 {/* Variance message banner */}
                 {hasInput && liveVariance !== null && (
