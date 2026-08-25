@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import {
   PackageSearch, UploadCloud, LayoutDashboard, Settings,
@@ -63,11 +63,17 @@ const pageTitles: Record<string, string> = {
 };
 
 export function AppLayout() {
-  const { signOut, user, agency } = useAuth();
+  const { signOut, user, agency, profile } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const { filename } = useStockStore();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [time, setTime] = useState(new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => setTime(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   const handleLogout = async () => { await signOut(); navigate('/login'); };
 
@@ -210,11 +216,33 @@ export function AppLayout() {
             <span style={{ fontSize: 14, fontWeight: 600, color: '#cbd5e1' }}>{pageTitle}</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            {filename && <span style={{ fontSize: 11, color: '#475569', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} className="filename-badge">{filename}</span>}
+            {filename && (
+              <span style={{
+                fontSize: 10, background: '#1e293b', color: '#38bdf8', border: '1px solid #334155',
+                padding: '4px 8px', borderRadius: 6, maxWidth: 160, overflow: 'hidden',
+                textOverflow: 'ellipsis', whiteSpace: 'nowrap'
+              }} className="filename-badge">
+                {filename}
+              </span>
+            )}
+            
+            <div style={{
+              display: 'flex', flexDirection: 'column', alignItems: 'flex-end',
+              background: '#1e293b', border: '1px solid #334155', borderRadius: 8,
+              padding: '4px 10px', flexShrink: 0
+            }} className="live-clock">
+              <span style={{ fontSize: 11, fontWeight: 700, color: '#38bdf8', fontFamily: 'monospace' }}>
+                {time.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}
+              </span>
+              <span style={{ fontSize: 9, color: '#94a3b8', fontWeight: 600 }}>
+                {time.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+              </span>
+            </div>
+
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <div style={{ textAlign: 'right' }} className="user-text">
                 <p style={{ fontSize: 12, fontWeight: 600, color: '#f1f5f9', margin: 0 }}>{user?.email?.split('@')[0] || 'Admin'}</p>
-                <p style={{ fontSize: 10, color: '#475569', margin: 0 }}>Administrator</p>
+                <p style={{ fontSize: 10, color: '#94a3b8', margin: 0 }}>{profile?.role || 'Administrator'}</p>
               </div>
               <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'linear-gradient(135deg, #4f46e5, #7c3aed)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: 13, flexShrink: 0 }}>
                 {user?.email?.[0]?.toUpperCase() || 'A'}
