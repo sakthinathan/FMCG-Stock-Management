@@ -23,39 +23,76 @@ serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    // Parse JSON body (expects Postmark Inbound Webhook JSON payload)
-    const body = await req.json()
+    const contentType = req.headers.get('content-type') || ''
+    let agencyId = ''
+    let fileName = 'StockMRP.xlsx'
+    let fileBytes: Uint8Array
 
-    // 1. Extract recipient email address to find target agency_id
-    const toEmail = body.To || ""
-    const agencyIdMatch = toEmail.match(/([a-fA-F0-9-]{36})/)
-    if (!agencyIdMatch) {
-      throw new Error("Could not find a valid 36-character Agency UUID in the recipient address ('To' header).")
-    }
-    const agencyId = agencyIdMatch[1]
+    if (contentType.includes('application/json')) {
+      // ── Scenario A: JSON Inbound Email Webhook ──
+      const body = await req.json()
+      
+      const toEmail = body.To || ""
+      const agencyIdMatch = toEmail.match(/([a-fA-F0-9-]{36})/)
+      if (!agencyIdMatch) {
+        throw new Error("Could not find a valid 36-character Agency UUID in the recipient address ('To' header).")
+      }
+      agencyId = agencyIdMatch[1]
 
-    // 2. Find Excel attachment
-    const attachments = body.Attachments || []
-    const excelAttachment = attachments.find((att: any) =>
-      att.Name.endsWith('.xlsx') ||
-      att.ContentType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-    )
+      const attachments = body.Attachments || []
+      const excelAttachment = attachments.find((att: any) =>
+        att.Name.endsWith('.xlsx') ||
+        att.ContentType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      )
+      if (!excelAttachment) {
+        throw new Error("No valid Excel (.xlsx) file attachment found in the email payload.")
+      }
+      fileName = excelAttachment.Name
+      
+      const base64Content = excelAttachment.Content
+      const binaryString = atob(base64Content)
+      const len = binaryString.length
+      fileBytes = new Uint8Array(len)
+      for (let i = 0; i < len; i++) {
+        fileBytes[i] = binaryString.charCodeAt(i)
+      }
+    } 
+    else if (contentType.includes('multipart/form-data')) {
+      // ── Scenario B: Multipart Form Upload ──
+      const formData = await req.formData()
+      const file = formData.get('file') as File | null
+      if (!file) {
+        throw new Error("No file found in multipart/form-data under key 'file'.")
+      }
+      fileName = file.name
+      const buffer = await file.arrayBuffer()
+      fileBytes = new Uint8Array(buffer)
 
-    if (!excelAttachment) {
-      throw new Error("No valid Excel (.xlsx) file attachment found in the email payload.")
-    }
+      agencyId = (formData.get('agency_id') as string) || 
+                 req.headers.get('x-agency-id') || 
+                 req.headers.get('X-Agency-ID') || ''
+      if (!agencyId) {
+        throw new Error("Missing 'agency_id' in form fields or 'x-agency-id' in headers.")
+      }
+    } 
+    else {
+      // ── Scenario C: Direct Raw Binary Upload ──
+      const buffer = await req.arrayBuffer()
+      fileBytes = new Uint8Array(buffer)
+      if (fileBytes.length === 0) {
+        throw new Error("Request body is empty.")
+      }
 
-    // 3. Decode base64 attachment content to bytes
-    const base64Content = excelAttachment.Content
-    const binaryString = atob(base64Content)
-    const len = binaryString.length
-    const bytes = new Uint8Array(len)
-    for (let i = 0; i < len; i++) {
-      bytes[i] = binaryString.charCodeAt(i)
+      agencyId = req.headers.get('x-agency-id') || req.headers.get('X-Agency-ID') || ''
+      fileName = req.headers.get('x-file-name') || req.headers.get('X-File-Name') || 'StockMRP.xlsx'
+
+      if (!agencyId) {
+        throw new Error("Missing 'x-agency-id' header for raw binary upload.")
+      }
     }
 
     // 4. Parse workbook using SheetJS
-    const workbook = XLSX.read(bytes, { type: 'array' })
+    const workbook = XLSX.read(fileBytes, { type: 'array' })
     const firstSheetName = workbook.SheetNames[0]
     const worksheet = workbook.Sheets[firstSheetName]
     const rawData: any[] = XLSX.utils.sheet_to_json(worksheet)
@@ -137,7 +174,7 @@ serve(async (req) => {
     const { data: uploadData, error: uploadErr } = await supabase
       .from('stock_uploads')
       .insert({
-        file_name: excelAttachment.Name,
+        file_name: fileName,
         total_records: products.length,
         agency_id: agencyId
       })
@@ -168,7 +205,7 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({
         success: true,
-        message: `Email parsed successfully. Created stock_upload record ${uploadData.id} with ${products.length} snapshots for agency ${agencyId}.`
+        message: `Stock sheet parsed and uploaded successfully. Created stock_upload record ${uploadData.id} with ${products.length} snapshots for agency ${agencyId}.`
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
