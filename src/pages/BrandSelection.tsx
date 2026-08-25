@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { PackageOpen, Loader2, Building2, ArrowRight } from 'lucide-react';
+import { PackageOpen, Loader2, Building2, ArrowRight, XCircle } from 'lucide-react';
 import { useStockStore } from '@/store/useStockStore';
 import { supabase } from '@/lib/supabase';
 import { motion } from 'framer-motion';
@@ -14,9 +14,32 @@ const card: React.CSSProperties = { background: '#fff', border: '1px solid #e2e8
 
 export function BrandSelection() {
   const navigate = useNavigate();
-  const { activeUploadId, filename } = useStockStore();
+  const { activeUploadId, filename, clearActiveUpload } = useStockStore();
   const [brands, setBrands] = useState<BrandSummary[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const handleCloseStockCheck = async () => {
+    if (!window.confirm("Are you sure you want to CLOSE the current stock check? Once closed, this session will end, and you will need to upload a new Excel file to start a new check.")) {
+      return;
+    }
+    
+    // Set all In Progress sessions of this upload to Completed
+    if (activeUploadId) {
+      try {
+        await supabase
+          .from('stock_count_sessions')
+          .update({ status: 'Completed' })
+          .eq('upload_id', activeUploadId)
+          .eq('status', 'In Progress');
+      } catch (e) {
+        console.error("Error closing sessions:", e);
+      }
+    }
+
+    clearActiveUpload();
+    alert("Stock check session closed successfully.");
+    navigate('/upload');
+  };
 
   useEffect(() => {
     async function load() {
@@ -91,7 +114,17 @@ export function BrandSelection() {
           <h1 style={{ fontSize: 20, fontWeight: 700, color: '#0f172a', margin: 0 }}>Brand-Wise Counting</h1>
           <p style={{ fontSize: 13, color: '#64748b', margin: '4px 0 0' }}>{filename} · {brands.length} brands · {done} completed</p>
         </div>
-        <div style={{ display: 'flex', gap: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <button
+            onClick={handleCloseStockCheck}
+            style={{
+              padding: '7px 14px', borderRadius: 8, border: '1px solid #fca5a5',
+              background: '#fef2f2', color: '#dc2626', fontSize: 12, fontWeight: 600,
+              cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 6
+            }}
+          >
+            <XCircle size={14} /> Close Stock Check
+          </button>
           <span style={{ fontSize: 11, fontWeight: 600, background: '#eef2ff', color: '#4338ca', padding: '4px 10px', borderRadius: 9999, border: '1px solid #c7d2fe' }}>{brands.length} Brands</span>
           <span style={{ fontSize: 11, fontWeight: 600, background: '#f0fdf4', color: '#16a34a', padding: '4px 10px', borderRadius: 9999, border: '1px solid #bbf7d0' }}>{done} Done</span>
         </div>

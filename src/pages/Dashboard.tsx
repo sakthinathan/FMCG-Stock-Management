@@ -83,7 +83,7 @@ export function Dashboard() {
       {/* Page header row */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
         <div>
-          <h1 style={{ fontSize: 22, fontWeight: 800, color: '#0f172a', margin: '0 0 3px', letterSpacing: '-0.3px' }}>Payroll Overview</h1>
+          <h1 style={{ fontSize: 22, fontWeight: 800, color: '#0f172a', margin: '0 0 3px', letterSpacing: '-0.3px' }}>Stock Overview</h1>
           <p style={{ fontSize: 13, color: '#64748b', margin: 0 }}>
             <strong style={{ color: '#334155' }}>{filename}</strong>
             {uploadedAt && <> &nbsp;·&nbsp; {new Date(uploadedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</>}
