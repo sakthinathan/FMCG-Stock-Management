@@ -76,9 +76,9 @@ CREATE POLICY "Allow users to read their own agency" ON agencies
         id = get_user_agency_id()
     );
 
-CREATE POLICY "Allow authenticated users to create agencies" ON agencies
+CREATE POLICY "Allow anyone to create agencies" ON agencies
     FOR INSERT WITH CHECK (
-        auth.role() = 'authenticated'
+        true
     );
 
 -- Profiles Policies
@@ -125,3 +125,27 @@ CREATE POLICY "Allow tenant all on physical_stock_counts" ON physical_stock_coun
     ) WITH CHECK (
         session_id IN (SELECT id FROM stock_count_sessions WHERE agency_id = get_user_agency_id())
     );
+
+-- 7. Database trigger to automatically create profiles for new auth users
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF NEW.raw_user_meta_data->>'agency_id' IS NOT NULL THEN
+    INSERT INTO public.profiles (id, agency_id, role)
+    VALUES (
+      NEW.id,
+      (NEW.raw_user_meta_data->>'agency_id')::uuid,
+      COALESCE(NEW.raw_user_meta_data->>'role', 'Owner')
+    );
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Drop trigger if exists
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+
+-- Create trigger
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();

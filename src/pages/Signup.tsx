@@ -17,15 +17,7 @@ export function Signup() {
     setLoading(true);
     setError(null);
     try {
-      // 1. Sign up user in Auth
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email,
-        password,
-      });
-      if (authError) throw authError;
-      if (!authData.user) throw new Error('Registration failed.');
-
-      // 2. Create Agency
+      // 1. Create Agency first (public insert allowed)
       const { data: agencyData, error: agencyError } = await supabase
         .from('agencies')
         .insert({
@@ -36,15 +28,19 @@ export function Signup() {
         .single();
       if (agencyError) throw agencyError;
 
-      // 3. Create profile
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .insert({
-          id: authData.user.id,
-          agency_id: agencyData.id,
-          role: 'Owner'
-        });
-      if (profileError) throw profileError;
+      // 2. Sign up user in Auth with agency metadata
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            agency_id: agencyData.id,
+            role: 'Owner'
+          }
+        }
+      });
+      if (authError) throw authError;
+      if (!authData.user) throw new Error('Registration failed.');
 
       alert('Agency and Admin Account registered successfully!');
       navigate('/login');
