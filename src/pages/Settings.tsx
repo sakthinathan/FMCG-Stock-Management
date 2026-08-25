@@ -14,19 +14,37 @@ export function Settings() {
   const { clearActiveUpload } = useStockStore();
   const navigate = useNavigate();
   const [isClearing, setIsClearing] = useState(false);
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [showResetPrompt, setShowResetPrompt] = useState(false);
+  const [deleteConfirmInput, setDeleteConfirmInput] = useState('');
+  const [modalMessage, setModalMessage] = useState<string | null>(null);
 
-  const handleFactoryReset = async () => {
-    if (!window.confirm('WARNING: This will permanently delete ALL stock uploads, snapshots, and counts. This cannot be undone. Are you sure?')) return;
-    if (prompt("Type 'DELETE' to confirm:") !== 'DELETE') return;
+  const handleFactoryReset = () => {
+    setShowResetConfirm(true);
+  };
+
+  const proceedToPrompt = () => {
+    setShowResetConfirm(false);
+    setDeleteConfirmInput('');
+    setShowResetPrompt(true);
+  };
+
+  const confirmFactoryReset = async () => {
+    if (deleteConfirmInput !== 'DELETE') {
+      setModalMessage("Verification word incorrect. Factory reset aborted.");
+      setShowResetPrompt(false);
+      return;
+    }
+    setShowResetPrompt(false);
     setIsClearing(true);
     try {
       const { error } = await supabase.from('stock_uploads').delete().neq('id', '00000000-0000-0000-0000-000000000000');
       if (error) throw error;
       clearActiveUpload();
-      alert('Database cleared successfully.');
+      setModalMessage('Database cleared successfully.');
       navigate('/');
     } catch (e: any) {
-      alert('Failed: ' + e.message);
+      setModalMessage('Failed: ' + e.message);
     } finally { setIsClearing(false); }
   };
 
@@ -194,6 +212,70 @@ export function Settings() {
           </div>
         ))}
       </div>
+
+      {/* Reusable Modal Dialog Components */}
+      {showResetConfirm && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: 16 }}>
+          <div style={{ background: 'var(--card)', border: '1px solid #fecaca', borderRadius: 16, width: '100%', maxWidth: 440, boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)', padding: 24, boxSizing: 'border-box', display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <h3 style={{ fontSize: 16, fontWeight: 700, color: '#dc2626', margin: 0 }}>Factory Reset Database?</h3>
+            <p style={{ fontSize: 13, color: 'var(--muted-foreground)', margin: 0, lineHeight: 1.5 }}>
+              WARNING: This will permanently delete ALL stock uploads, snapshots, and counts. This cannot be undone. Are you sure you want to proceed?
+            </p>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 4 }}>
+              <button onClick={() => setShowResetConfirm(false)}
+                style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid var(--border)', background: 'transparent', color: 'var(--foreground)', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+                Cancel
+              </button>
+              <button onClick={proceedToPrompt}
+                style={{ padding: '8px 16px', borderRadius: 8, border: 'none', background: '#dc2626', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+                Yes, Proceed
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showResetPrompt && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: 16 }}>
+          <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 16, width: '100%', maxWidth: 440, boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)', padding: 24, boxSizing: 'border-box', display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--foreground)', margin: 0 }}>Confirm Destruction</h3>
+            <p style={{ fontSize: 13, color: 'var(--muted-foreground)', margin: 0 }}>
+              To confirm factory reset, please type <strong>DELETE</strong> in the box below:
+            </p>
+            <input type="text" value={deleteConfirmInput} onChange={e => setDeleteConfirmInput(e.target.value)} placeholder="DELETE"
+              style={{ width: '100%', height: 40, padding: '0 12px', boxSizing: 'border-box', borderRadius: 8, border: '1.5px solid var(--border)', background: 'var(--background)', color: 'var(--foreground)', outline: 'none', fontSize: 13, fontFamily: 'inherit' }}
+              onKeyDown={e => { if (e.key === 'Enter') confirmFactoryReset(); }}
+            />
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 4 }}>
+              <button onClick={() => setShowResetPrompt(false)}
+                style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid var(--border)', background: 'transparent', color: 'var(--foreground)', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+                Cancel
+              </button>
+              <button onClick={confirmFactoryReset}
+                style={{ padding: '8px 16px', borderRadius: 8, border: 'none', background: '#dc2626', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+                Confirm Reset
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {modalMessage && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: 16 }}>
+          <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 16, width: '100%', maxWidth: 400, boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)', padding: 24, boxSizing: 'border-box', display: 'flex', flexDirection: 'column', gap: 16, textAlign: 'center' }}>
+            <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--foreground)', margin: 0 }}>Notification</h3>
+            <p style={{ fontSize: 13, color: 'var(--muted-foreground)', margin: 0, lineHeight: 1.5 }}>
+              {modalMessage}
+            </p>
+            <div style={{ display: 'flex', justifyContent: 'center', marginTop: 4 }}>
+              <button onClick={() => setModalMessage(null)}
+                style={{ padding: '8px 24px', borderRadius: 8, border: 'none', background: '#4f46e5', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+                OK
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
     </div>

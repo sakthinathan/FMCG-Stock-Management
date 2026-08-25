@@ -19,13 +19,19 @@ export function BrandSelection() {
   const { profile } = useAuth();
   const [brands, setBrands] = useState<BrandSummary[]>([]);
   const [loading, setLoading] = useState(true);
+  
+  // Custom Modal States
+  const [showCloseConfirm, setShowCloseConfirm] = useState(false);
+  const [showSessionPrompt, setShowSessionPrompt] = useState(false);
+  const [pendingBrandName, setPendingBrandName] = useState('');
+  const [sessionNameInput, setSessionNameInput] = useState('');
 
-  const handleCloseStockCheck = async () => {
-    if (!window.confirm("Are you sure you want to CLOSE the current stock check? Once closed, this session will end, and you will need to upload a new Excel file to start a new check.")) {
-      return;
-    }
-    
-    // Set all In Progress sessions of this upload to Completed
+  const handleCloseStockCheck = () => {
+    setShowCloseConfirm(true);
+  };
+
+  const confirmCloseStockCheck = async () => {
+    setShowCloseConfirm(false);
     if (activeUploadId) {
       try {
         await supabase
@@ -37,9 +43,7 @@ export function BrandSelection() {
         console.error("Error closing sessions:", e);
       }
     }
-
     clearActiveUpload();
-    alert("Stock check session closed successfully.");
     navigate('/upload');
   };
 
@@ -75,14 +79,37 @@ export function BrandSelection() {
   }, [activeUploadId]);
 
   const handleStart = async (name: string, sessionId: string | null) => {
-    let sid = sessionId;
-    if (!sid) {
-      const sname = window.prompt('Session name (optional):', `Count - ${name}`);
-      if (sname === null) return;
-      const { data } = await supabase.from('stock_count_sessions').insert({ upload_id: activeUploadId, brand: name, session_name: sname || `Count - ${name}`, status: 'In Progress', agency_id: profile?.agency_id }).select().single();
-      if (data) sid = data.id;
+    if (sessionId) {
+      navigate(`/count/${sessionId}`);
+      return;
     }
-    if (sid) navigate(`/count/${sid}`);
+    setPendingBrandName(name);
+    setSessionNameInput(`Count - ${name}`);
+    setShowSessionPrompt(true);
+  };
+
+  const confirmStartSession = async () => {
+    setShowSessionPrompt(false);
+    try {
+      const sname = sessionNameInput || `Count - ${pendingBrandName}`;
+      const { data } = await supabase
+        .from('stock_count_sessions')
+        .insert({
+          upload_id: activeUploadId,
+          brand: pendingBrandName,
+          session_name: sname,
+          status: 'In Progress',
+          agency_id: profile?.agency_id
+        })
+        .select()
+        .single();
+      
+      if (data) {
+        navigate(`/count/${data.id}`);
+      }
+    } catch (e) {
+      console.error(e);
+    }
   };
 
   if (loading) return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 240 }}><Loader2 size={30} color="#4f46e5" style={{ animation: 'spin 1s linear infinite' }} /></div>;
@@ -186,6 +213,54 @@ export function BrandSelection() {
           );
         })}
       </div>
+
+      {/* Reusable Modal Dialog Components */}
+      {showCloseConfirm && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: 16 }}>
+          <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 16, width: '100%', maxWidth: 440, boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)', padding: 24, boxSizing: 'border-box', display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--foreground)', margin: 0 }}>Close Stock Check?</h3>
+            <p style={{ fontSize: 13, color: 'var(--muted-foreground)', margin: 0, lineHeight: 1.5 }}>
+              Are you sure you want to CLOSE the current stock check? Once closed, this session will end, and you will need to upload a new Excel file to start a new check.
+            </p>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 4 }}>
+              <button onClick={() => setShowCloseConfirm(false)}
+                style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid var(--border)', background: 'transparent', color: 'var(--foreground)', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+                Cancel
+              </button>
+              <button onClick={confirmCloseStockCheck}
+                style={{ padding: '8px 16px', borderRadius: 8, border: 'none', background: '#dc2626', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+                Close Session
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showSessionPrompt && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: 16 }}>
+          <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 16, width: '100%', maxWidth: 440, boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)', padding: 24, boxSizing: 'border-box', display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--foreground)', margin: 0 }}>New Count Session</h3>
+            <p style={{ fontSize: 13, color: 'var(--muted-foreground)', margin: 0 }}>
+              Create a new auditing session for brand <strong>{pendingBrandName}</strong>. You can optionally name this session below:
+            </p>
+            <input type="text" value={sessionNameInput} onChange={e => setSessionNameInput(e.target.value)} placeholder={`Count - ${pendingBrandName}`}
+              style={{ width: '100%', height: 40, padding: '0 12px', boxSizing: 'border-box', borderRadius: 8, border: '1.5px solid var(--border)', background: 'var(--background)', color: 'var(--foreground)', outline: 'none', fontSize: 13, fontFamily: 'inherit' }}
+              onKeyDown={e => { if (e.key === 'Enter') confirmStartSession(); }}
+            />
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 4 }}>
+              <button onClick={() => setShowSessionPrompt(false)}
+                style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid var(--border)', background: 'transparent', color: 'var(--foreground)', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+                Cancel
+              </button>
+              <button onClick={confirmStartSession}
+                style={{ padding: '8px 16px', borderRadius: 8, border: 'none', background: '#4f46e5', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+                Start Session
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
     </div>
   );
