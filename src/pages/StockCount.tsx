@@ -1,71 +1,59 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
-import { ChevronLeft, ChevronRight, ArrowLeft, Loader2, ListChecks, TrendingUp, TrendingDown, Minus, AlertTriangle, Package, Sparkles } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ArrowLeft, Loader2, ListChecks, AlertTriangle, Package, Search, CheckCircle2, MessageSquare } from 'lucide-react';
 import { useStockStore } from '@/store/useStockStore';
 import { supabase } from '@/lib/supabase';
-import { cn } from '@/lib/utils';
-import { motion, AnimatePresence } from 'framer-motion';
+
+const W: React.CSSProperties = { background: '#fff', borderRadius: 12, boxShadow: '0 1px 3px rgba(0,0,0,0.06)' };
+
+const statusStyle = (s: string) => {
+  if (s === 'Equal')    return { bg: '#f0fdf4', color: '#16a34a', border: '#bbf7d0' };
+  if (s === 'Shortage') return { bg: '#fef2f2', color: '#dc2626', border: '#fecaca' };
+  if (s === 'Excess')   return { bg: '#fffbeb', color: '#d97706', border: '#fde68a' };
+  return { bg: '#f8fafc', color: '#64748b', border: '#e2e8f0' };
+};
+
+const btn = (primary = true, disabled = false): React.CSSProperties => ({
+  display: 'inline-flex', alignItems: 'center', gap: 7, padding: '9px 18px',
+  borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: disabled ? 'not-allowed' : 'pointer',
+  border: 'none', fontFamily: 'inherit',
+  background: primary ? (disabled ? '#a5b4fc' : '#4f46e5') : (disabled ? '#f8fafc' : '#fff'),
+  color: primary ? '#fff' : '#374151',
+  ...(primary ? {} : { border: '1px solid #e2e8f0' }),
+  opacity: disabled ? 0.7 : 1,
+});
+
 
 export function StockCount() {
   const { sessionId } = useParams();
   const navigate = useNavigate();
   const { activeUploadId } = useStockStore();
-  
+
+  const [brandName, setBrandName] = useState('');
   const [allProducts, setAllProducts] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [hideCounted, setHideCounted] = useState(false);
   const [issuesOnly, setIssuesOnly] = useState(false);
   const [sortQueue, setSortQueue] = useState<'A-Z' | 'Highest Value' | 'Highest Variance'>('A-Z');
-  
-  const [currentIndex, setCurrentIndex] = useState(0);
+
+  const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
-  
+
+  // Input states
   const [cbb, setCbb] = useState('');
   const [pcs, setPcs] = useState('');
   const [notes, setNotes] = useState('');
   const [reasonCode, setReasonCode] = useState('');
-  
-  const products = allProducts
-    .filter(p => {
-      const matchesSearch = p.material.toLowerCase().includes(searchQuery.toLowerCase()) || p.material_desc.toLowerCase().includes(searchQuery.toLowerCase());
-      const isCounted = p.existingCbb !== '' || p.existingPcs !== '';
-      if (hideCounted && isCounted) return false;
-      if (issuesOnly) {
-        if (!isCounted) return false;
-        const totalPhy = (parseInt(p.existingCbb || '0') * p.conversion) + parseInt(p.existingPcs || '0');
-        if (totalPhy === p.system_qty_pcs) return false;
-      }
-      return matchesSearch;
-    })
-    .sort((a, b) => {
-      if (sortQueue === 'Highest Value') return b.mrp - a.mrp;
-      if (sortQueue === 'Highest Variance') {
-        const varA = Math.abs(a.prev_variance || 0);
-        const varB = Math.abs(b.prev_variance || 0);
-        return varB - varA;
-      }
-      return a.material.localeCompare(b.material);
-    });
-  
-  const currentProduct = products[currentIndex];
-  
-  const [variance, setVariance] = useState<number | null>(null);
-  const [varianceChange, setVarianceChange] = useState<number | null>(null);
-  const [status, setStatus] = useState<'Equal' | 'Shortage' | 'Excess' | null>(null);
 
+  // 1. Load session & products
   useEffect(() => {
     async function loadSession() {
       if (!sessionId || !activeUploadId) {
         navigate('/brands');
         return;
       }
-
       try {
         const { data: sessionData, error: sessionError } = await supabase
           .from('stock_count_sessions')
@@ -74,6 +62,7 @@ export function StockCount() {
           .single();
 
         if (sessionError) throw sessionError;
+        setBrandName(sessionData.brand);
 
         const { data: snapshotData, error: snapError } = await supabase
           .from('system_stock_snapshots')
@@ -90,203 +79,33 @@ export function StockCount() {
 
         if (countError) throw countError;
 
-        const mergedProducts = snapshotData.map(snap => {
-          const existingCount = countsData?.find(c => c.snapshot_id === snap.id);
+        const merged = snapshotData.map(snap => {
+          const c = countsData?.find(x => x.snapshot_id === snap.id);
           return {
             ...snap,
-            existingCbb: existingCount ? existingCount.physical_cbb : '',
-            existingPcs: existingCount ? existingCount.physical_pcs : '',
-            existingNotes: existingCount?.notes || '',
-            existingReason: existingCount?.reason_code || '',
+            existingCbb: c ? String(c.physical_cbb) : '',
+            existingPcs: c ? String(c.physical_pcs) : '',
+            existingNotes: c?.notes || '',
+            existingReason: c?.reason_code || '',
+            existingStatus: c?.status || 'Uncounted',
+            existingVariance: c ? c.variance : null,
           };
         });
 
-        setAllProducts(mergedProducts);
-      } catch (error) {
-        console.error("Error loading session:", error);
+        setAllProducts(merged);
+        if (merged.length > 0) {
+          setSelectedProductId(merged[0].id);
+        }
+      } catch (e) {
+        console.error(e);
       } finally {
         setLoading(false);
       }
     }
-
     loadSession();
-  }, [sessionId, activeUploadId, navigate]);
+  }, [sessionId, activeUploadId]);
 
-  // Realtime subscription for duplicate count prevention
-  useEffect(() => {
-    if (!sessionId) return;
-
-    const channel = supabase.channel(`public:physical_stock_counts:${sessionId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'physical_stock_counts',
-          filter: `session_id=eq.${sessionId}`,
-        },
-        (payload) => {
-          if (payload.eventType === 'DELETE') {
-            const oldData = payload.old as any;
-            if (oldData && oldData.snapshot_id) {
-              setAllProducts((prevProducts) => {
-                const newProducts = [...prevProducts];
-                const idx = newProducts.findIndex((p) => p.id === oldData.snapshot_id);
-                if (idx !== -1) {
-                  newProducts[idx].existingCbb = '';
-                  newProducts[idx].existingPcs = '';
-                  newProducts[idx].existingNotes = '';
-                  newProducts[idx].existingReason = '';
-                  
-                  if (currentProduct && currentProduct.id === oldData.snapshot_id) {
-                    setCbb('');
-                    setPcs('');
-                    setNotes('');
-                    setReasonCode('');
-                  }
-                }
-                return newProducts;
-              });
-            }
-          } else {
-            const newData = payload.new as any;
-            if (newData && newData.snapshot_id) {
-              setAllProducts((prevProducts) => {
-                const newProducts = [...prevProducts];
-                const idx = newProducts.findIndex((p) => p.id === newData.snapshot_id);
-                if (idx !== -1) {
-                  if (newProducts[idx].existingCbb !== newData.physical_cbb || newProducts[idx].existingPcs !== newData.physical_pcs || newProducts[idx].existingNotes !== newData.notes || newProducts[idx].existingReason !== newData.reason_code) {
-                    newProducts[idx].existingCbb = newData.physical_cbb;
-                    newProducts[idx].existingPcs = newData.physical_pcs;
-                    newProducts[idx].existingNotes = newData.notes || '';
-                    newProducts[idx].existingReason = newData.reason_code || '';
-                    
-                    if (currentProduct && currentProduct.id === newData.snapshot_id) {
-                      setCbb(String(newData.physical_cbb));
-                      setPcs(String(newData.physical_pcs));
-                      setNotes(newData.notes || '');
-                      setReasonCode(newData.reason_code || '');
-                    }
-                  }
-                }
-                return newProducts;
-              });
-            }
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [sessionId, currentProduct]);
-
-  // Reset index to 0 when search query, sort, or filter changes
-  useEffect(() => {
-    setCurrentIndex(0);
-  }, [searchQuery, hideCounted, issuesOnly, sortQueue]);
-
-  useEffect(() => {
-    if (currentProduct) {
-      setCbb(currentProduct.existingCbb !== '' ? String(currentProduct.existingCbb) : '');
-      setPcs(currentProduct.existingPcs !== '' ? String(currentProduct.existingPcs) : '');
-      setNotes(currentProduct.existingNotes || '');
-      setReasonCode(currentProduct.existingReason || '');
-      setVariance(null);
-      setVarianceChange(null);
-      setStatus(null);
-    } else {
-      setCbb('');
-      setPcs('');
-      setNotes('');
-      setReasonCode('');
-      setVariance(null);
-      setVarianceChange(null);
-      setStatus(null);
-    }
-  }, [currentIndex, allProducts, searchQuery, hideCounted, issuesOnly, sortQueue]);
-
-  // Recalculate variance whenever CBB or PCS changes & Auto-Save
-  useEffect(() => {
-    if (!currentProduct) return;
-
-    const evaluatedCbb = evaluateMath(cbb);
-    const evaluatedPcs = evaluateMath(pcs);
-
-    const cbbVal = evaluatedCbb !== '' ? parseInt(evaluatedCbb, 10) : 0;
-    const pcsVal = evaluatedPcs !== '' ? parseInt(evaluatedPcs, 10) : 0;
-
-    if (evaluatedCbb === '' && evaluatedPcs === '') {
-      setVariance(null);
-      setVarianceChange(null);
-      setStatus(null);
-      setSaveStatus('idle');
-      return;
-    }
-
-    const totalPhysicalPcs = (cbbVal * currentProduct.conversion) + pcsVal;
-    const currentVariance = totalPhysicalPcs - currentProduct.system_qty_pcs;
-
-    setVariance(currentVariance);
-
-    let currentStatus: 'Equal' | 'Shortage' | 'Excess' = 'Equal';
-    if (currentVariance < 0) currentStatus = 'Shortage';
-    else if (currentVariance > 0) currentStatus = 'Excess';
-
-    setStatus(currentStatus);
-
-    // Auto-Save Logic
-    const hasChanged = cbbVal !== currentProduct.existingCbb || pcsVal !== currentProduct.existingPcs || notes !== currentProduct.existingNotes || reasonCode !== currentProduct.existingReason;
-    if (!hasChanged) {
-      setSaveStatus('idle');
-      return;
-    }
-
-    setSaveStatus('saving');
-    
-    const timer = setTimeout(async () => {
-      try {
-        const { error } = await supabase
-          .from('physical_stock_counts')
-          .upsert({
-            session_id: sessionId,
-            snapshot_id: currentProduct.id,
-            physical_cbb: cbbVal,
-            physical_pcs: pcsVal,
-            physical_total_pcs: totalPhysicalPcs,
-            variance: currentVariance,
-            status: currentStatus,
-            notes: notes,
-            reason_code: reasonCode
-          }, { onConflict: 'session_id,snapshot_id' });
-
-        if (error) throw error;
-        setSaveStatus('saved');
-
-        // Update local state in allProducts silently
-        setAllProducts(prev => {
-          const newAll = [...prev];
-          const allIndex = newAll.findIndex(p => p.id === currentProduct.id);
-          if (allIndex !== -1) {
-            newAll[allIndex].existingCbb = cbbVal;
-            newAll[allIndex].existingPcs = pcsVal;
-            newAll[allIndex].existingNotes = notes;
-            newAll[allIndex].existingReason = reasonCode;
-          }
-          return newAll;
-        });
-
-      } catch (error) {
-        console.error("Auto-save failed:", error);
-        setSaveStatus('idle');
-      }
-    }, 400);
-
-    return () => clearTimeout(timer);
-
-  }, [cbb, pcs, notes, reasonCode, currentProduct, sessionId]);
-
+  // Evaluate simple math in inputs (e.g. 5+10)
   const evaluateMath = (str: string) => {
     if (!str) return '';
     try {
@@ -296,38 +115,105 @@ export function StockCount() {
           return String(Math.floor(res));
         }
       }
-    } catch {
-      // ignore
-    }
+    } catch {}
     return str;
   };
 
-  const handleCbbBlur = () => {
-    setCbb(evaluateMath(cbb));
-  };
+  // Filter products list
+  const filteredProducts = allProducts
+    .filter(p => {
+      const matchesSearch = p.material.toLowerCase().includes(searchQuery.toLowerCase()) || p.material_desc.toLowerCase().includes(searchQuery.toLowerCase());
+      const isCounted = p.existingCbb !== '' || p.existingPcs !== '';
+      if (hideCounted && isCounted) return false;
+      if (issuesOnly) {
+        if (!isCounted) return false;
+        if (p.existingVariance === 0 || p.existingVariance === null) return false;
+      }
+      return matchesSearch;
+    })
+    .sort((a, b) => {
+      if (sortQueue === 'Highest Value') return b.mrp - a.mrp;
+      if (sortQueue === 'Highest Variance') {
+        return Math.abs(b.prev_variance || 0) - Math.abs(a.prev_variance || 0);
+      }
+      return a.material.localeCompare(b.material);
+    });
 
-  const handlePcsBlur = () => {
-    setPcs(evaluateMath(pcs));
-  };
+  const currentProduct = allProducts.find(p => p.id === selectedProductId) || filteredProducts[0];
+  const currentIndex = currentProduct ? filteredProducts.findIndex(p => p.id === currentProduct.id) : -1;
+
+  // Initialize inputs when selected product changes
+  useEffect(() => {
+    if (currentProduct) {
+      setCbb(currentProduct.existingCbb);
+      setPcs(currentProduct.existingPcs);
+      setNotes(currentProduct.existingNotes);
+      setReasonCode(currentProduct.existingReason);
+      setSaveStatus('idle');
+    } else {
+      setCbb(''); setPcs(''); setNotes(''); setReasonCode('');
+      setSaveStatus('idle');
+    }
+  }, [selectedProductId, allProducts]);
+
+  // Calculate live variance
+  const cbbVal = evaluateMath(cbb) !== '' ? parseInt(evaluateMath(cbb), 10) : 0;
+  const pcsVal = evaluateMath(pcs) !== '' ? parseInt(evaluateMath(pcs), 10) : 0;
+  const hasInput = cbb !== '' || pcs !== '';
+  const totalPhysical = currentProduct ? (cbbVal * currentProduct.conversion) + pcsVal : 0;
+  const liveVariance = currentProduct ? totalPhysical - currentProduct.system_qty_pcs : null;
+  const liveStatus = liveVariance === null ? null : liveVariance === 0 ? 'Equal' : liveVariance < 0 ? 'Shortage' : 'Excess';
+
+  // Auto-Save Effect
+  useEffect(() => {
+    if (!currentProduct || !sessionId) return;
+    const isDifferent = cbb !== currentProduct.existingCbb || pcs !== currentProduct.existingPcs || notes !== currentProduct.existingNotes || reasonCode !== currentProduct.existingReason;
+    if (!isDifferent) return;
+
+    setSaveStatus('saving');
+    const t = setTimeout(async () => {
+      try {
+        const { error } = await supabase
+          .from('physical_stock_counts')
+          .upsert({
+            session_id: sessionId,
+            snapshot_id: currentProduct.id,
+            physical_cbb: cbbVal,
+            physical_pcs: pcsVal,
+            physical_total_pcs: totalPhysical,
+            variance: liveVariance,
+            status: liveStatus,
+            notes,
+            reason_code: reasonCode
+          }, { onConflict: 'session_id,snapshot_id' });
+
+        if (error) throw error;
+        setSaveStatus('saved');
+
+        // Update local memory silently
+        setAllProducts(prev => prev.map(p => p.id === currentProduct.id ? {
+          ...p,
+          existingCbb: cbb,
+          existingPcs: pcs,
+          existingNotes: notes,
+          existingReason: reasonCode,
+          existingStatus: liveStatus,
+          existingVariance: liveVariance
+        } : p));
+      } catch (e) {
+        console.error(e);
+        setSaveStatus('idle');
+      }
+    }, 500);
+
+    return () => clearTimeout(t);
+  }, [cbb, pcs, notes, reasonCode, currentProduct, sessionId]);
 
   const handleSaveAndNext = async () => {
     if (!currentProduct || !sessionId) return;
-
     setSaving(true);
     try {
-      const evaluatedCbb = evaluateMath(cbb);
-      const evaluatedPcs = evaluateMath(pcs);
-
-      const cbbVal = evaluatedCbb !== '' ? parseInt(evaluatedCbb, 10) : 0;
-      const pcsVal = evaluatedPcs !== '' ? parseInt(evaluatedPcs, 10) : 0;
-
-      const totalPhysicalPcs = (cbbVal * currentProduct.conversion) + pcsVal;
-      const currentVariance = totalPhysicalPcs - currentProduct.system_qty_pcs;
-
-      let currentStatus: 'Equal' | 'Shortage' | 'Excess' = 'Equal';
-      if (currentVariance < 0) currentStatus = 'Shortage';
-      else if (currentVariance > 0) currentStatus = 'Excess';
-
+      // 1. Force immediately save current state to db
       const { error } = await supabase
         .from('physical_stock_counts')
         .upsert({
@@ -335,40 +221,61 @@ export function StockCount() {
           snapshot_id: currentProduct.id,
           physical_cbb: cbbVal,
           physical_pcs: pcsVal,
-          physical_total_pcs: totalPhysicalPcs,
-          variance: currentVariance,
-          status: currentStatus,
-          notes: notes,
+          physical_total_pcs: totalPhysical,
+          variance: liveVariance,
+          status: liveStatus,
+          notes,
           reason_code: reasonCode
         }, { onConflict: 'session_id,snapshot_id' });
 
       if (error) throw error;
 
-      setAllProducts(prev => {
-        const newAll = [...prev];
-        const allIndex = newAll.findIndex(p => p.id === currentProduct.id);
-        if (allIndex !== -1) {
-          newAll[allIndex].existingCbb = cbbVal;
-          newAll[allIndex].existingPcs = pcsVal;
-          newAll[allIndex].existingNotes = notes;
-          newAll[allIndex].existingReason = reasonCode;
-        }
-        return newAll;
-      });
+      // Update local memory
+      const updatedProducts = allProducts.map(p => p.id === currentProduct.id ? {
+        ...p,
+        existingCbb: cbb,
+        existingPcs: pcs,
+        existingNotes: notes,
+        existingReason: reasonCode,
+        existingStatus: liveStatus,
+        existingVariance: liveVariance
+      } : p);
+      setAllProducts(updatedProducts);
 
-      if (currentIndex < products.length - 1) {
-        setCurrentIndex(prev => prev + 1);
+      // Determine next product BEFORE changing the active product
+      // If hideCounted is true, the current product will be filtered out. 
+      // So the next item will actually shift to the same position (currentIndex).
+      // Let's compute next item carefully:
+      let nextProduct = null;
+      if (hideCounted) {
+        // Find next product in the list that is NOT the current one and is uncounted
+        const remainingUncounted = filteredProducts.filter(p => p.id !== currentProduct.id);
+        if (remainingUncounted.length > 0) {
+          // Stay at same index if possible, or clamp to last
+          const nextIdx = Math.min(currentIndex, remainingUncounted.length - 1);
+          nextProduct = remainingUncounted[nextIdx];
+        }
       } else {
-        const { error: sessionUpdateError } = await supabase
+        if (currentIndex < filteredProducts.length - 1) {
+          nextProduct = filteredProducts[currentIndex + 1];
+        }
+      }
+
+      if (nextProduct) {
+        setSelectedProductId(nextProduct.id);
+      } else {
+        // Complete session
+        const { error: completeErr } = await supabase
           .from('stock_count_sessions')
           .update({ status: 'Completed' })
           .eq('id', sessionId);
-          
-        if (sessionUpdateError) console.error("Error completing session:", sessionUpdateError);
+        if (completeErr) throw completeErr;
+        alert('Audit session completed!');
         navigate('/brands');
       }
-    } catch (error) {
-      console.error("Error saving count:", error);
+    } catch (e) {
+      console.error(e);
+      alert('Failed to save count.');
     } finally {
       setSaving(false);
     }
@@ -376,350 +283,234 @@ export function StockCount() {
 
   const handlePrev = () => {
     if (currentIndex > 0) {
-      setCurrentIndex(prev => prev - 1);
+      setSelectedProductId(filteredProducts[currentIndex - 1].id);
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center h-[60vh]">
-        <Loader2 className="h-10 w-10 animate-spin text-indigo-500" />
-      </div>
-    );
-  }
+  if (loading) return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh' }}><Loader2 size={32} color="#4f46e5" style={{ animation: 'spin 1s linear infinite' }} /></div>;
 
   return (
-    <div className="mx-auto max-w-xl space-y-4 pb-12">
-      {/* Top Controls Toolbar */}
-      <div className="flex flex-col gap-3">
-        <div className="flex items-center justify-between gap-2">
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            onClick={() => navigate('/brands')} 
-            className="pl-0 text-muted-foreground hover:text-foreground hover:bg-transparent font-semibold text-sm"
-          >
-            <ArrowLeft className="mr-1.5 h-4 w-4" />
-            Brands
-          </Button>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20, fontFamily: "'Inter', sans-serif" }}>
+      {/* Top breadcrumb */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <button onClick={() => navigate('/brands')} style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', color: '#64748b', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}>
+          <ArrowLeft size={16} /> Brands Selection
+        </button>
+        <span style={{ fontSize: 13, fontWeight: 700, color: '#4f46e5' }}>{brandName} Queue</span>
+      </div>
 
-          <div className="flex items-center gap-2">
-            {/* Hide Counted Pill */}
-            <div 
-              className={cn(
-                "flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-xl cursor-pointer transition-all border",
-                hideCounted 
-                  ? "bg-indigo-500/20 text-indigo-300 border-indigo-500/40 shadow-sm" 
-                  : "bg-card text-muted-foreground border-border hover:bg-secondary"
-              )} 
-              onClick={() => { setHideCounted(!hideCounted); setIssuesOnly(false); }}
-            >
-              <div className={cn("w-3.5 h-3.5 rounded-full border flex items-center justify-center transition-colors", hideCounted ? "bg-indigo-500 border-indigo-500" : "border-slate-600")}>
-                {hideCounted && <div className="w-1.5 h-1.5 bg-white rounded-full" />}
-              </div>
-              Hide Counted
+      {/* Main split layout */}
+      <div className="stock-count-layout" style={{ display: 'flex', gap: 20 }}>
+        
+        {/* Left Side: SKUs list (Desktop only, scrollable) */}
+        <div className="skus-list-panel" style={{ ...W, width: 320, display: 'flex', flexDirection: 'column', height: 'calc(100vh - 160px)', flexShrink: 0 }}>
+          {/* List Search & Filters */}
+          <div style={{ padding: 14, borderBottom: '1px solid #f1f5f9', display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ position: 'relative' }}>
+              <Search size={14} color="#94a3b8" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)' }} />
+              <input
+                placeholder="Filter items..."
+                value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
+                style={{ width: '100%', height: 34, paddingLeft: 30, paddingRight: 10, border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 12, outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit' }}
+              />
             </div>
+            {/* Filter checkboxes */}
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                onClick={() => { setHideCounted(!hideCounted); setIssuesOnly(false); }}
+                style={{ flex: 1, padding: '5px 8px', borderRadius: 6, border: hideCounted ? '1px solid #c7d2fe' : '1px solid #e2e8f0', background: hideCounted ? '#eef2ff' : '#fff', color: hideCounted ? '#4f46e5' : '#475569', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
+              >
+                Hide Counted
+              </button>
+              <button
+                onClick={() => { setIssuesOnly(!issuesOnly); setHideCounted(false); }}
+                style={{ flex: 1, padding: '5px 8px', borderRadius: 6, border: issuesOnly ? '1px solid #fecaca' : '1px solid #e2e8f0', background: issuesOnly ? '#fef2f2' : '#fff', color: issuesOnly ? '#dc2626' : '#475569', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
+              >
+                Issues Only
+              </button>
+            </div>
+          </div>
 
-            {/* Issues Only Pill */}
-            <div 
-              className={cn(
-                "flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-xl cursor-pointer transition-all border",
-                issuesOnly 
-                  ? "bg-rose-500/20 text-rose-300 border-rose-500/40 shadow-sm" 
-                  : "bg-card text-muted-foreground border-border hover:bg-secondary"
-              )} 
-              onClick={() => { setIssuesOnly(!issuesOnly); setHideCounted(false); }}
-            >
-              <div className={cn("w-3.5 h-3.5 rounded-full border flex items-center justify-center transition-colors", issuesOnly ? "bg-rose-500 border-rose-500" : "border-slate-600")}>
-                {issuesOnly && <div className="w-1.5 h-1.5 bg-white rounded-full" />}
-              </div>
-              Issues Only
-            </div>
+          {/* List scroll area */}
+          <div style={{ flex: 1, overflowY: 'auto', padding: 8 }}>
+            {filteredProducts.length === 0 ? (
+              <div style={{ padding: '32px 16px', textAlign: 'center', color: '#94a3b8', fontSize: 12 }}>No matching SKUs</div>
+            ) : (
+              filteredProducts.map(p => {
+                const active = p.id === selectedProductId;
+                const isCounted = p.existingCbb !== '' || p.existingPcs !== '';
+                const sc = statusStyle(p.existingStatus);
+                return (
+                  <div
+                    key={p.id}
+                    onClick={() => setSelectedProductId(p.id)}
+                    style={{
+                      padding: '10px 12px', borderRadius: 8, marginBottom: 4, cursor: 'pointer',
+                      background: active ? '#eef2ff' : 'transparent',
+                      borderLeft: `3px solid ${isCounted ? sc.border : 'transparent'}`,
+                      transition: 'background 0.15s',
+                    }}
+                    onMouseEnter={e => { if (!active) (e.currentTarget as HTMLElement).style.background = '#f8fafc'; }}
+                    onMouseLeave={e => { if (!active) (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 6, marginBottom: 2 }}>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: active ? '#4f46e5' : '#475569', fontFamily: 'monospace' }}>{p.material}</span>
+                      {isCounted && <span style={{ fontSize: 9, fontWeight: 800, color: sc.color }}>{p.existingStatus}</span>}
+                    </div>
+                    <p style={{ fontSize: 12, fontWeight: active ? 600 : 500, color: '#1e293b', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {p.material_desc}
+                    </p>
+                  </div>
+                );
+              })
+            )}
           </div>
         </div>
-        
-        {/* Search & Sort Bar */}
-        <div className="flex gap-2">
-          <div className="relative flex-1">
-            <Input 
-              type="search" 
-              placeholder="Search material or code..." 
-              className="w-full h-11 bg-card border-border focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 rounded-xl pl-4 pr-10 text-sm font-medium placeholder:text-muted-foreground" 
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-          </div>
-          <select 
-            className="flex h-11 w-36 items-center rounded-xl border border-border bg-card px-3 text-xs font-semibold text-muted-foreground focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            value={sortQueue}
-            onChange={(e) => setSortQueue(e.target.value as any)}
-          >
-            <option value="A-Z">A-Z</option>
-            <option value="Highest Value">High Value</option>
-            <option value="Highest Variance">High Variance</option>
-          </select>
+
+        {/* Right Side: Active item counting card */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {!currentProduct ? (
+            <div style={{ ...W, padding: '64px 32px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14 }}>
+              <Package size={36} color="#cbd5e1" />
+              <div>
+                <h3 style={{ fontSize: 16, fontWeight: 700, color: '#0f172a', margin: 0 }}>No items to audit</h3>
+                <p style={{ fontSize: 12, color: '#64748b', margin: '4px 0 0' }}>All items in this brand queue have been counted.</p>
+              </div>
+              <button onClick={() => { setSearchQuery(''); setHideCounted(false); setIssuesOnly(false); }} style={{ ...btn(), padding: '8px 16px' }}>
+                Reset Filters
+              </button>
+            </div>
+          ) : (
+            <div style={{ ...W, padding: '24px 28px', display: 'flex', flexDirection: 'column', gap: 20 }}>
+              
+              {/* Product Info */}
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 6 }}>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Item {currentIndex + 1} of {filteredProducts.length}</span>
+                  <span style={{ fontSize: 11, fontWeight: 600, background: '#f1f5f9', color: '#475569', padding: '2px 8px', borderRadius: 4 }}>MRP ₹{currentProduct.mrp}</span>
+                </div>
+                <h2 style={{ fontSize: 20, fontWeight: 800, color: '#0f172a', margin: '0 0 10px', lineHeight: 1.3 }}>{currentProduct.material_desc}</h2>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: '#4f46e5', fontFamily: 'monospace', background: '#eef2ff', padding: '3px 8px', borderRadius: 6 }}>SKU {currentProduct.material}</span>
+                  <span style={{ fontSize: 11, fontWeight: 600, color: '#4b5563', background: '#f3f4f6', padding: '3px 8px', borderRadius: 6 }}>1 Case (CBB) = {currentProduct.conversion} PCS</span>
+                </div>
+              </div>
+
+              {/* Large Touch Input Grid */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                <div>
+                  <label style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', display: 'block', marginBottom: 6 }}>Cartons (CBB)</label>
+                  <input
+                    type="text" placeholder="0"
+                    value={cbb} onChange={e => setCbb(e.target.value)}
+                    style={{ width: '100%', height: 64, border: '1.5px solid #e2e8f0', borderRadius: 12, fontSize: 28, fontWeight: 800, textAlign: 'center', outline: 'none', background: '#fff', boxSizing: 'border-box', fontFamily: 'inherit' }}
+                    onFocus={e => e.target.select()}
+                  />
+                  <span style={{ fontSize: 10, color: '#94a3b8', display: 'block', marginTop: 4, textAlign: 'center' }}>= {cbbVal * currentProduct.conversion} PCS</span>
+                </div>
+                <div>
+                  <label style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', display: 'block', marginBottom: 6 }}>Loose (PCS)</label>
+                  <input
+                    type="text" placeholder="0"
+                    value={pcs} onChange={e => setPcs(e.target.value)}
+                    style={{ width: '100%', height: 64, border: '1.5px solid #e2e8f0', borderRadius: 12, fontSize: 28, fontWeight: 800, textAlign: 'center', outline: 'none', background: '#fff', boxSizing: 'border-box', fontFamily: 'inherit' }}
+                    onFocus={e => e.target.select()}
+                  />
+                  <span style={{ fontSize: 10, color: '#94a3b8', display: 'block', marginTop: 4, textAlign: 'center' }}>Single pieces</span>
+                </div>
+              </div>
+
+              {/* Calculation Summary Row */}
+              <div style={{ background: '#f8fafc', borderRadius: 10, padding: 14, display: 'flex', flexDirection: 'column', gap: 10, border: '1px solid #f1f5f9' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: 12, color: '#64748b', fontWeight: 500 }}>System Stock Target</span>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: '#334155' }}>{currentProduct.system_qty_pcs} PCS</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: 12, color: '#64748b', fontWeight: 500 }}>Your Count Total</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    {saveStatus === 'saving' && <span style={{ fontSize: 10, color: '#4f46e5', fontWeight: 600 }}>Saving...</span>}
+                    {saveStatus === 'saved' && <span style={{ fontSize: 10, color: '#10b981', fontWeight: 600 }}>Saved ✓</span>}
+                    <span style={{ fontSize: 14, fontWeight: 800, color: '#0f172a' }}>{totalPhysical} PCS</span>
+                  </div>
+                </div>
+
+                {/* Variance message banner */}
+                {hasInput && liveVariance !== null && (
+                  <div style={{
+                    marginTop: 4, padding: '10px 14px', borderRadius: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                    background: liveStatus === 'Equal' ? '#f0fdf4' : liveStatus === 'Shortage' ? '#fef2f2' : '#fffbeb',
+                    border: `1px solid ${liveStatus === 'Equal' ? '#bbf7d0' : liveStatus === 'Shortage' ? '#fecaca' : '#fde68a'}`,
+                    color: liveStatus === 'Equal' ? '#16a34a' : liveStatus === 'Shortage' ? '#dc2626' : '#d97706',
+                  }}>
+                    <div>
+                      <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', margin: 0 }}>{liveStatus}</p>
+                      <p style={{ fontSize: 18, fontWeight: 800, margin: 0 }}>{Math.abs(liveVariance)} PCS</p>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <p style={{ fontSize: 10, fontWeight: 600, margin: 0, opacity: 0.8 }}>Impact</p>
+                      <p style={{ fontSize: 13, fontWeight: 700, margin: 0 }}>₹{Math.round(Math.abs(liveVariance * currentProduct.mrp)).toLocaleString('en-IN')}</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* supervisor details if discrepancy */}
+              {hasInput && liveStatus !== 'Equal' && liveStatus !== null && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  <div>
+                    <label style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', display: 'block', marginBottom: 6 }}>Reason Code</label>
+                    <select value={reasonCode} onChange={e => setReasonCode(e.target.value)}
+                      style={{ width: '100%', height: 38, padding: '0 10px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 13, color: '#374151', background: '#fff', outline: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>
+                      <option value="">Select reason...</option>
+                      <option value="Damaged">Damaged Goods</option>
+                      <option value="Expired">Expired Goods</option>
+                      <option value="Missing Box">Missing Box / Carton</option>
+                      <option value="Wrong Box">Wrong Box Contents</option>
+                      <option value="Theft Suspected">Theft Suspected</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', display: 'block', marginBottom: 6 }}>Auditor Notes</label>
+                    <textarea
+                      placeholder="Add supervisor explanation note..."
+                      value={notes} onChange={e => setNotes(e.target.value)}
+                      style={{ width: '100%', height: 60, padding: 10, border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 12, outline: 'none', background: '#fff', boxSizing: 'border-box', fontFamily: 'inherit', resize: 'none' }}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Prev / Next Action buttons */}
+              <div style={{ display: 'flex', gap: 10, marginTop: 6 }}>
+                <button
+                  onClick={handlePrev} disabled={currentIndex <= 0 || saving}
+                  style={{ ...btn(false, currentIndex <= 0 || saving), flex: 1, height: 44, justifyContent: 'center' }}
+                >
+                  <ChevronLeft size={16} /> Prev
+                </button>
+                <button
+                  onClick={handleSaveAndNext} disabled={saving}
+                  style={{ ...btn(true, saving), flex: 2, height: 44, justifyContent: 'center' }}
+                >
+                  {saving ? <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} /> : null}
+                  {currentIndex === filteredProducts.length - 1 ? 'Complete Audit' : 'Save & Next'}
+                  {!saving && currentIndex < filteredProducts.length - 1 && <ChevronRight size={16} />}
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
-      {!currentProduct ? (
-        <motion.div 
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="text-center mt-8 p-10 bg-card border border-border shadow-sm rounded-xl rounded-3xl border-border shadow-2xl"
-        >
-          <div className="bg-secondary/50 h-16 w-16 rounded-2xl flex items-center justify-center mx-auto mb-4 text-muted-foreground">
-            <Package className="h-8 w-8" />
-          </div>
-          <h3 className="text-xl font-bold text-foreground">No products match</h3>
-          <p className="text-muted-foreground text-xs mt-1">Try clearing filters or searching another material.</p>
-          <Button onClick={() => { setSearchQuery(''); setHideCounted(false); setIssuesOnly(false); }} className="mt-5 rounded-xl font-bold bg-indigo-600 hover:bg-indigo-500" size="sm">
-            Reset Filters
-          </Button>
-        </motion.div>
-      ) : (
-        <>
-          {/* Progress Header */}
-          <div className="flex justify-between items-center px-1">
-            <span className="text-xs font-bold tracking-wider text-muted-foreground uppercase">
-              Item Queue
-            </span>
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-extrabold bg-indigo-500/15 text-indigo-300 border border-indigo-500/30 px-3 py-1 rounded-full">
-                {currentIndex + 1} / {products.length}
-              </span>
-            </div>
-          </div>
-
-          {/* Main Counting Terminal Card */}
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={currentProduct.id}
-              initial={{ opacity: 0, scale: 0.98 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.98 }}
-              transition={{ duration: 0.2 }}
-            >
-              <Card className={cn(
-                "bg-card border border-border shadow-sm rounded-xl border-border shadow-2xl rounded-3xl overflow-hidden relative transition-all duration-300",
-                status === 'Equal' ? 'glow-green border-emerald-500/30' :
-                status === 'Shortage' ? 'glow-red border-rose-500/30' :
-                status === 'Excess' ? 'glow-amber border-amber-500/30' : ''
-              )}>
-                <CardContent className="p-5 sm:p-7 relative z-10 space-y-6">
-                  {/* Material Title & Badges */}
-                  <div>
-                    <h2 className="text-xl sm:text-2xl font-black text-foreground leading-tight tracking-tight">
-                      {currentProduct.material_desc}
-                    </h2>
-                    <div className="mt-3 flex flex-wrap items-center gap-2">
-                      <Badge variant="outline" className="font-mono text-xs bg-secondary/50 border-border text-foreground px-2.5 py-1">
-                        {currentProduct.material}
-                      </Badge>
-                      <Badge variant="secondary" className="text-xs bg-secondary text-muted-foreground px-2.5 py-1 font-bold">
-                        MRP ₹{currentProduct.mrp}
-                      </Badge>
-                      <Badge variant="secondary" className="bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 text-xs px-2.5 py-1 font-bold">
-                        1 CBB = {currentProduct.conversion} PCS
-                      </Badge>
-                    </div>
-                  </div>
-
-                  {/* CBB & PCS Large Touch Input Boxes */}
-                  <div className="grid grid-cols-2 gap-3 sm:gap-4">
-                    <div className="space-y-2">
-                      <div className="flex justify-between items-center">
-                        <label className="text-xs font-black text-muted-foreground uppercase tracking-wider">Cartons (CBB)</label>
-                        <span className="text-[10px] text-indigo-400 font-semibold">x{currentProduct.conversion} PCS</span>
-                      </div>
-                      <Input 
-                        type="text" 
-                        inputMode="text"
-                        placeholder="0" 
-                        className="text-center text-3xl sm:text-4xl h-20 font-black bg-card border-border focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/20 rounded-2xl text-foreground transition-all shadow-inner" 
-                        value={cbb}
-                        onChange={(e) => setCbb(e.target.value)}
-                        onBlur={handleCbbBlur}
-                        onFocus={(e) => e.target.select()}
-                      />
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <div className="flex justify-between items-center">
-                        <label className="text-xs font-black text-muted-foreground uppercase tracking-wider">Loose (PCS)</label>
-                        <span className="text-[10px] text-muted-foreground font-semibold">1x</span>
-                      </div>
-                      <Input 
-                        type="text" 
-                        inputMode="text"
-                        placeholder="0" 
-                        className="text-center text-3xl sm:text-4xl h-20 font-black bg-card border-border focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/20 rounded-2xl text-foreground transition-all shadow-inner" 
-                        value={pcs}
-                        onChange={(e) => setPcs(e.target.value)}
-                        onBlur={handlePcsBlur}
-                        onFocus={(e) => e.target.select()}
-                      />
-                    </div>
-                  </div>
-
-                  {/* System Expectation & Live Physical Total */}
-                  <div className="rounded-2xl border border-border bg-card p-4 space-y-3">
-                    <div className="flex justify-between items-center">
-                      <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">System Expects</span>
-                      <span className="font-extrabold text-sm text-foreground bg-secondary px-3 py-1 rounded-xl border border-border">
-                        {currentProduct.system_qty_pcs} PCS
-                      </span>
-                    </div>
-                    
-                    {variance !== null && (
-                      <motion.div 
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: 'auto' }}
-                        className="pt-3 border-t border-border space-y-4"
-                      >
-                        <div className="flex justify-between items-center">
-                          <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Physical Total</span>
-                          <div className="flex items-center gap-3">
-                            <AnimatePresence mode="wait">
-                              {saveStatus === 'saving' && (
-                                <motion.div 
-                                  initial={{ opacity: 0, scale: 0.8 }}
-                                  animate={{ opacity: 1, scale: 1 }}
-                                  exit={{ opacity: 0, scale: 0.8 }}
-                                  className="text-[11px] font-bold text-indigo-400 flex items-center bg-indigo-500/10 border border-indigo-500/20 px-2 py-0.5 rounded-full"
-                                >
-                                  <Loader2 className="h-3 w-3 animate-spin mr-1" />
-                                  Auto-Saving
-                                </motion.div>
-                              )}
-                              {saveStatus === 'saved' && (
-                                <motion.div 
-                                  initial={{ opacity: 0, scale: 0.8 }}
-                                  animate={{ opacity: 1, scale: 1 }}
-                                  exit={{ opacity: 0, scale: 0.8 }}
-                                  className="text-[11px] font-bold text-emerald-400 flex items-center bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full"
-                                >
-                                  <ListChecks className="h-3 w-3 mr-1" />
-                                  Auto-Saved
-                                </motion.div>
-                              )}
-                            </AnimatePresence>
-                            <span className="font-black text-xl text-foreground">
-                              {((parseInt(evaluateMath(cbb))||0) * currentProduct.conversion) + (parseInt(evaluateMath(pcs))||0)} PCS
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* Status & Variance Banner */}
-                        <div className={cn(
-                          "flex items-center justify-between p-4 rounded-2xl border transition-all duration-300",
-                          status === 'Equal' ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400" :
-                          status === 'Shortage' ? "bg-rose-500/10 border-rose-500/30 text-rose-400" :
-                          "bg-amber-500/10 border-amber-500/30 text-amber-400"
-                        )}>
-                          <div className="flex flex-col">
-                            <span className="text-xs font-black uppercase tracking-widest opacity-90 mb-0.5">{status}</span>
-                            <span className="font-black text-2xl sm:text-3xl">
-                              {Math.abs(variance)} PCS
-                            </span>
-                          </div>
-                          
-                          <div className="text-right">
-                            <span className="text-[10px] font-bold uppercase tracking-wider opacity-75">Financial Impact</span>
-                            <div className="font-extrabold text-sm sm:text-base mt-0.5">
-                              {variance < 0 ? '-' : variance > 0 ? '+' : ''}₹{Math.abs(variance * currentProduct.mrp).toLocaleString('en-IN')}
-                            </div>
-                          </div>
-                        </div>
-                        
-                        {/* High Deviation Alert */}
-                        {variance !== null && Math.abs(variance) >= (currentProduct.system_qty_pcs * 0.20) && Math.abs(variance) >= 5 && (
-                          <motion.div
-                            initial={{ opacity: 0, y: -5 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            className="p-3 bg-rose-950/40 border border-rose-500/40 rounded-2xl flex items-start gap-3"
-                          >
-                            <AlertTriangle className="h-5 w-5 text-rose-400 shrink-0 mt-0.5" />
-                            <div>
-                              <h4 className="text-xs font-extrabold text-rose-300">High Variance Warning</h4>
-                              <p className="text-[11px] text-rose-400/90 mt-0.5 leading-relaxed">
-                                Count deviates by more than 20% from system records. Please double-check physical cartons.
-                              </p>
-                            </div>
-                          </motion.div>
-                        )}
-                        
-                        {/* Reason Code & Notes for Discrepancies */}
-                        {variance !== null && status !== 'Equal' && (
-                          <motion.div 
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            className="pt-3 border-t border-border space-y-3"
-                          >
-                            <div className="space-y-1.5">
-                              <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Reason Code</label>
-                              <select 
-                                className="w-full h-10 rounded-xl border border-border bg-card px-3 text-xs font-semibold text-foreground focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                                value={reasonCode}
-                                onChange={(e) => setReasonCode(e.target.value)}
-                              >
-                                <option value="">Select reason code (optional)...</option>
-                                <option value="Damaged">Damaged Goods</option>
-                                <option value="Expired">Expired Goods</option>
-                                <option value="Missing Box">Missing Box / Carton</option>
-                                <option value="Wrong Box">Wrong Box Contents</option>
-                                <option value="Theft Suspected">Theft Suspected</option>
-                                <option value="Other">Other</option>
-                              </select>
-                            </div>
-                            
-                            <div className="space-y-1.5">
-                              <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Auditor Notes</label>
-                              <textarea 
-                                className="w-full rounded-xl border border-border bg-card p-3 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none h-16 placeholder:text-slate-600"
-                                placeholder="Add notes for the audit supervisor..."
-                                value={notes}
-                                onChange={(e) => setNotes(e.target.value)}
-                              />
-                            </div>
-                          </motion.div>
-                        )}
-                      </motion.div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
-          </AnimatePresence>
-
-          {/* Action Buttons: Prev & Save/Next */}
-          <div className="flex gap-3 pt-1">
-            <Button 
-              variant="outline" 
-              className="flex-1 h-14 rounded-2xl font-bold text-sm bg-card border-border text-muted-foreground hover:bg-secondary hover:text-foreground transition-all shadow-md" 
-              onClick={handlePrev} 
-              disabled={currentIndex === 0 || saving}
-            >
-              <ChevronLeft className="mr-1.5 h-4 w-4" />
-              Previous
-            </Button>
-            <Button 
-              className={cn(
-                "flex-[2] h-14 rounded-2xl font-extrabold text-base shadow-xl transition-all duration-300 text-foreground",
-                variance !== null && status === 'Equal' ? "bg-emerald-600 hover:bg-emerald-500 shadow-emerald-600/30" :
-                variance !== null && status === 'Shortage' ? "bg-rose-600 hover:bg-rose-500 shadow-rose-600/30" :
-                variance !== null && status === 'Excess' ? "bg-amber-600 hover:bg-amber-500 shadow-amber-600/30" :
-                "bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 shadow-indigo-600/30"
-              )}
-              onClick={handleSaveAndNext}
-              disabled={saving}
-            >
-              {saving ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
-              {currentIndex === products.length - 1 ? 'Complete Brand Audit' : 'Save & Next'}
-              {!saving && currentIndex !== products.length - 1 && <ChevronRight className="ml-1.5 h-5 w-5" />}
-            </Button>
-          </div>
-        </>
-      )}
+      <style>{`
+        .stock-count-layout { display: flex; }
+        @media (max-width: 1023px) {
+          .skus-list-panel { display: none !important; }
+        }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+      `}</style>
     </div>
   );
 }
