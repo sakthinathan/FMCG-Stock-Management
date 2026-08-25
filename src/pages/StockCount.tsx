@@ -436,7 +436,7 @@ export function StockCount() {
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 6 }}>
                   <span style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Item {currentIndex + 1} of {filteredProducts.length}</span>
-                  <span style={{ fontSize: 11, fontWeight: 600, background: '#f1f5f9', color: '#475569', padding: '2px 8px', borderRadius: 4 }}>MRP ₹{currentProduct.mrp}</span>
+                  <span style={{ fontSize: 13, fontWeight: 700, background: '#fef3c7', color: '#b45309', padding: '3px 10px', borderRadius: 6, border: '1px solid #fde68a' }}>MRP ₹{currentProduct.mrp}</span>
                 </div>
                 <h2 style={{ fontSize: 20, fontWeight: 800, color: '#0f172a', margin: '0 0 10px', lineHeight: 1.3 }}>{currentProduct.material_desc}</h2>
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>

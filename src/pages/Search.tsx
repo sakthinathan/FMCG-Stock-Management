@@ -114,12 +114,15 @@ export function Search() {
                       ...(item.status !== 'Uncounted' ? [
                         { label: 'Physical Qty', value: `${item.physical_total_pcs} PCS` },
                       ] : []),
-                    ].map(r => (
-                      <div key={r.label} style={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <span style={{ fontSize: 11, color: '#94a3b8', fontWeight: 500 }}>{r.label}</span>
-                        <span style={{ fontSize: 11, fontWeight: 700, color: '#334155' }}>{r.value}</span>
-                      </div>
-                    ))}
+                    ].map(r => {
+                      const isMrp = r.label === 'MRP';
+                      return (
+                        <div key={r.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ fontSize: 11, color: '#94a3b8', fontWeight: 500 }}>{r.label}</span>
+                          <span style={{ fontSize: isMrp ? 13 : 11, fontWeight: 700, color: isMrp ? '#b45309' : '#334155' }}>{r.value}</span>
+                        </div>
+                      );
+                    })}
                     {item.status !== 'Uncounted' && (
                       <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #e2e8f0', paddingTop: 6, marginTop: 2 }}>
                         <span style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600 }}>Variance</span>

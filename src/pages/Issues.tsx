@@ -124,7 +124,7 @@ export function Issues() {
                     <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6, marginBottom: 4 }}>
                       <span style={{ fontWeight: 700, color: '#0f172a', fontSize: 14 }}>{issue.material}</span>
                       <span style={{ fontSize: 10, fontWeight: 600, background: '#f1f5f9', color: '#475569', padding: '2px 6px', borderRadius: 4, border: '1px solid #e2e8f0' }}>{issue.brand}</span>
-                      <span style={{ fontSize: 10, background: '#f8fafc', color: '#64748b', padding: '2px 6px', borderRadius: 4, border: '1px solid #e2e8f0' }}>MRP ₹{issue.mrp}</span>
+                      <span style={{ fontSize: 11, fontWeight: 700, background: '#fef3c7', color: '#b45309', padding: '2px 6px', borderRadius: 4, border: '1px solid #fde68a' }}>MRP ₹{issue.mrp}</span>
                       {issue.trend && <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 6px', borderRadius: 4, background: trendCfg.bg, color: trendCfg.color, border: `1px solid ${trendCfg.border}` }}>{issue.trend}</span>}
                     </div>
                     <p style={{ fontSize: 12, color: '#64748b', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 340 }}>{issue.desc}</p>
