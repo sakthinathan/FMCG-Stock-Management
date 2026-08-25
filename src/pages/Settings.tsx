@@ -20,7 +20,7 @@ export function Settings() {
     if (prompt("Type 'DELETE' to confirm:") !== 'DELETE') return;
     setIsClearing(true);
     try {
-      const { error } = await supabase.from('stock_uploads').delete().neq('id', 0);
+      const { error } = await supabase.from('stock_uploads').delete().neq('id', '00000000-0000-0000-0000-000000000000');
       if (error) throw error;
       clearActiveUpload();
       alert('Database cleared successfully.');
