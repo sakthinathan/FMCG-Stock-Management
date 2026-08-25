@@ -55,6 +55,7 @@ $$;
 -- Drop any conflicting policies
 DROP POLICY IF EXISTS "Allow users to read their own agency" ON agencies;
 DROP POLICY IF EXISTS "Allow authenticated users to create agencies" ON agencies;
+DROP POLICY IF EXISTS "Allow anyone to create agencies" ON agencies;
 DROP POLICY IF EXISTS "Allow users to read profiles in same agency" ON profiles;
 DROP POLICY IF EXISTS "Allow users to manage own profile" ON profiles;
 DROP POLICY IF EXISTS "Allow users to select profiles in same agency" ON profiles;
