@@ -38,56 +38,90 @@ SELECT id, '00000000-0000-0000-0000-000000000001', 'Owner'
 FROM auth.users
 ON CONFLICT (id) DO NOTHING;
 
--- 6. Setup RLS Policies for Tenant Isolation
+-- 6. Setup Recursion-Free RLS Policies via Security Definer Helper
 
--- Agencies Policy
+-- Create a helper function with SECURITY DEFINER to bypass RLS recursion
+CREATE OR REPLACE FUNCTION get_user_agency_id()
+RETURNS UUID
+SECURITY DEFINER
+SET search_path = public
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  RETURN (SELECT agency_id FROM profiles WHERE id = auth.uid());
+END;
+$$;
+
+-- Drop any conflicting policies
 DROP POLICY IF EXISTS "Allow users to read their own agency" ON agencies;
+DROP POLICY IF EXISTS "Allow authenticated users to create agencies" ON agencies;
+DROP POLICY IF EXISTS "Allow users to read profiles in same agency" ON profiles;
+DROP POLICY IF EXISTS "Allow users to manage own profile" ON profiles;
+DROP POLICY IF EXISTS "Allow users to select profiles in same agency" ON profiles;
+DROP POLICY IF EXISTS "Allow users to write own profile" ON profiles;
+DROP POLICY IF EXISTS "Allow tenant all on stock_uploads" ON stock_uploads;
+DROP POLICY IF EXISTS "Allow tenant all on stock_count_sessions" ON stock_count_sessions;
+DROP POLICY IF EXISTS "Allow tenant read on system_stock_snapshots" ON system_stock_snapshots;
+DROP POLICY IF EXISTS "Allow tenant all on physical_stock_counts" ON physical_stock_counts;
+DROP POLICY IF EXISTS "Allow public all on stock_uploads" ON stock_uploads;
+DROP POLICY IF EXISTS "Allow public all on stock_count_sessions" ON stock_count_sessions;
+DROP POLICY IF EXISTS "Allow public all on system_stock_snapshots" ON system_stock_snapshots;
+DROP POLICY IF EXISTS "Allow public all on physical_stock_counts" ON physical_stock_counts;
+
+-- Setup clean policies using helper:
+
+-- Agencies Policies
 CREATE POLICY "Allow users to read their own agency" ON agencies
     FOR SELECT USING (
-        id = (SELECT agency_id FROM profiles WHERE id = auth.uid())
+        id = get_user_agency_id()
     );
 
--- Profiles Policy
-DROP POLICY IF EXISTS "Allow users to read profiles in same agency" ON profiles;
-CREATE POLICY "Allow users to read profiles in same agency" ON profiles
+CREATE POLICY "Allow authenticated users to create agencies" ON agencies
+    FOR INSERT WITH CHECK (
+        auth.role() = 'authenticated'
+    );
+
+-- Profiles Policies
+CREATE POLICY "Allow users to select profiles in same agency" ON profiles
+    FOR SELECT USING (
+        agency_id = get_user_agency_id()
+    );
+
+CREATE POLICY "Allow users to write own profile" ON profiles
     FOR ALL USING (
-        agency_id = (SELECT agency_id FROM profiles WHERE id = auth.uid())
+        id = auth.uid()
     ) WITH CHECK (
-        agency_id = (SELECT agency_id FROM profiles WHERE id = auth.uid())
+        id = auth.uid()
     );
 
--- Stock Uploads Policy
-DROP POLICY IF EXISTS "Allow public all on stock_uploads" ON stock_uploads;
+-- Stock Uploads Policies
 CREATE POLICY "Allow tenant all on stock_uploads" ON stock_uploads
     FOR ALL USING (
-        agency_id = (SELECT agency_id FROM profiles WHERE id = auth.uid())
+        agency_id = get_user_agency_id()
     ) WITH CHECK (
-        agency_id = (SELECT agency_id FROM profiles WHERE id = auth.uid())
+        agency_id = get_user_agency_id()
     );
 
--- Stock Count Sessions Policy
-DROP POLICY IF EXISTS "Allow public all on stock_count_sessions" ON stock_count_sessions;
+-- Stock Count Sessions Policies
 CREATE POLICY "Allow tenant all on stock_count_sessions" ON stock_count_sessions
     FOR ALL USING (
-        agency_id = (SELECT agency_id FROM profiles WHERE id = auth.uid())
+        agency_id = get_user_agency_id()
     ) WITH CHECK (
-        agency_id = (SELECT agency_id FROM profiles WHERE id = auth.uid())
+        agency_id = get_user_agency_id()
     );
 
--- System Stock Snapshots Policy (Inherited security via upload relation join)
-DROP POLICY IF EXISTS "Allow public all on system_stock_snapshots" ON system_stock_snapshots;
+-- System Stock Snapshots Policies
 CREATE POLICY "Allow tenant read on system_stock_snapshots" ON system_stock_snapshots
     FOR ALL USING (
-        upload_id IN (SELECT id FROM stock_uploads WHERE agency_id = (SELECT agency_id FROM profiles WHERE id = auth.uid()))
+        upload_id IN (SELECT id FROM stock_uploads WHERE agency_id = get_user_agency_id())
     ) WITH CHECK (
-        upload_id IN (SELECT id FROM stock_uploads WHERE agency_id = (SELECT agency_id FROM profiles WHERE id = auth.uid()))
+        upload_id IN (SELECT id FROM stock_uploads WHERE agency_id = get_user_agency_id())
     );
 
--- Physical Stock Counts Policy (Inherited security via session relation join)
-DROP POLICY IF EXISTS "Allow public all on physical_stock_counts" ON physical_stock_counts;
+-- Physical Stock Counts Policies
 CREATE POLICY "Allow tenant all on physical_stock_counts" ON physical_stock_counts
     FOR ALL USING (
-        session_id IN (SELECT id FROM stock_count_sessions WHERE agency_id = (SELECT agency_id FROM profiles WHERE id = auth.uid()))
+        session_id IN (SELECT id FROM stock_count_sessions WHERE agency_id = get_user_agency_id())
     ) WITH CHECK (
-        session_id IN (SELECT id FROM stock_count_sessions WHERE agency_id = (SELECT agency_id FROM profiles WHERE id = auth.uid()))
+        session_id IN (SELECT id FROM stock_count_sessions WHERE agency_id = get_user_agency_id())
     );
