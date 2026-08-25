@@ -12,6 +12,7 @@ import { Login } from './pages/Login';
 import { Settings } from './pages/Settings';
 import { Sessions } from './pages/Sessions';
 import { Search } from './pages/Search';
+import { Signup } from './pages/Signup';
 
 function AuthGuard({ children }: { children: React.ReactNode }) {
   const { session, isLoading } = useAuth();
@@ -34,6 +35,7 @@ function App() {
         <Router basename={import.meta.env.BASE_URL}>
           <Routes>
             <Route path="/login" element={<Login />} />
+            <Route path="/signup" element={<Signup />} />
             
             <Route element={<AuthGuard><AppLayout /></AuthGuard>}>
               <Route path="/" element={<Dashboard />} />

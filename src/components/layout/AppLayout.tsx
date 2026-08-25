@@ -63,7 +63,7 @@ const pageTitles: Record<string, string> = {
 };
 
 export function AppLayout() {
-  const { signOut, user } = useAuth();
+  const { signOut, user, agency } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const { filename } = useStockStore();
@@ -86,12 +86,12 @@ export function AppLayout() {
         <div style={{ padding: '20px 20px 16px', borderBottom: '1px solid #f1f5f9' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <img 
-              src={`${import.meta.env.BASE_URL}britannia_logo.png`} 
-              alt="Britannia Logo"
+              src={agency?.logo_url || `${import.meta.env.BASE_URL}britannia_logo.png`} 
+              alt="Agency Logo"
               style={{ height: 28, objectFit: 'contain' }}
             />
             <div>
-              <p style={{ fontSize: 13, fontWeight: 800, color: '#0f172a', margin: 0, letterSpacing: '-0.2px' }}>THULIR AGENCY</p>
+              <p style={{ fontSize: 13, fontWeight: 800, color: '#0f172a', margin: 0, letterSpacing: '-0.2px' }}>{agency?.name || 'THULIR AGENCY'}</p>
               <p style={{ fontSize: 10, color: '#94a3b8', margin: '1px 0 0' }}>Stock Management</p>
             </div>
           </div>
@@ -159,11 +159,11 @@ export function AppLayout() {
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 16px', borderBottom: '1px solid #f1f5f9' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <img 
-                  src={`${import.meta.env.BASE_URL}britannia_logo.png`} 
-                  alt="Britannia Logo"
+                  src={agency?.logo_url || `${import.meta.env.BASE_URL}britannia_logo.png`} 
+                  alt="Agency Logo"
                   style={{ height: 24, objectFit: 'contain' }}
                 />
-                <span style={{ fontSize: 13, fontWeight: 800, color: '#0f172a' }}>THULIR AGENCY</span>
+                <span style={{ fontSize: 13, fontWeight: 800, color: '#0f172a' }}>{agency?.name || 'THULIR AGENCY'}</span>
               </div>
               <button onClick={() => setMobileMenuOpen(false)} style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#64748b', display: 'flex' }}><X size={20} /></button>
             </div>
@@ -200,11 +200,11 @@ export function AppLayout() {
             </button>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }} className="topbar-logo">
               <img 
-                src={`${import.meta.env.BASE_URL}britannia_logo.png`} 
-                alt="Britannia Logo"
+                src={agency?.logo_url || `${import.meta.env.BASE_URL}britannia_logo.png`} 
+                alt="Agency Logo"
                 style={{ height: 24, objectFit: 'contain' }}
               />
-              <span style={{ fontSize: 13, fontWeight: 800, color: '#fff', letterSpacing: '-0.2px' }}>THULIR AGENCY</span>
+              <span style={{ fontSize: 13, fontWeight: 800, color: '#fff', letterSpacing: '-0.2px' }}>{agency?.name || 'THULIR AGENCY'}</span>
             </div>
             <ChevronRight size={14} color="#334155" />
             <span style={{ fontSize: 14, fontWeight: 600, color: '#cbd5e1' }}>{pageTitle}</span>

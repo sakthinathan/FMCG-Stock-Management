@@ -3,6 +3,7 @@ import { UploadCloud, FileSpreadsheet, CheckCircle2, AlertCircle, Loader2, Histo
 import { parseExcelFile, type ParseResult } from '@/lib/excelParser';
 import { useStockStore } from '@/store/useStockStore';
 import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/contexts/AuthContext';
 
 const card: React.CSSProperties = { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, boxShadow: '0 1px 3px rgba(0,0,0,0.06)' };
 const btn = (primary = true): React.CSSProperties => ({
@@ -13,6 +14,7 @@ const btn = (primary = true): React.CSSProperties => ({
 });
 
 export function UploadStock() {
+  const { profile } = useAuth();
   const [isUploading, setIsUploading] = useState(false);
   const [parseResult, setParseResult] = useState<ParseResult | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -35,7 +37,7 @@ export function UploadStock() {
       if (result.products.length === 0) { setError('No valid products found.'); setIsUploading(false); return; }
 
       const { data: uploadData, error: uploadError } = await supabase.from('stock_uploads')
-        .insert({ file_name: file.name, total_records: result.products.length }).select().single();
+        .insert({ file_name: file.name, total_records: result.products.length, agency_id: profile?.agency_id }).select().single();
       if (uploadError) throw uploadError;
 
       const prevVariances = new Map();

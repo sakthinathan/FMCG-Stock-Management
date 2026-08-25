@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 import { PackageSearch, Mail, Lock, Eye, EyeOff, ArrowRight, Loader2 } from 'lucide-react';
 
@@ -116,6 +116,9 @@ export function Login() {
             }
           </button>
         </form>
+        <div style={{ marginTop: 20, textAlign: 'center', fontSize: 13, color: '#64748b' }}>
+          Don't have an agency? <Link to="/signup" style={{ color: '#4f46e5', fontWeight: 600, textDecoration: 'none' }}>Register here</Link>
+        </div>
       </div>
 
       <p style={{ marginTop: 24, fontSize: 11, color: '#475569', letterSpacing: '0.08em', textTransform: 'uppercase' }}>

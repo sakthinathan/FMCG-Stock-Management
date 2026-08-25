@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { PackageOpen, Loader2, Building2, ArrowRight, XCircle } from 'lucide-react';
 import { useStockStore } from '@/store/useStockStore';
 import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/contexts/AuthContext';
 import { motion } from 'framer-motion';
 
 interface BrandSummary {
@@ -15,6 +16,7 @@ const card: React.CSSProperties = { background: '#fff', border: '1px solid #e2e8
 export function BrandSelection() {
   const navigate = useNavigate();
   const { activeUploadId, filename, clearActiveUpload } = useStockStore();
+  const { profile } = useAuth();
   const [brands, setBrands] = useState<BrandSummary[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -77,7 +79,7 @@ export function BrandSelection() {
     if (!sid) {
       const sname = window.prompt('Session name (optional):', `Count - ${name}`);
       if (sname === null) return;
-      const { data } = await supabase.from('stock_count_sessions').insert({ upload_id: activeUploadId, brand: name, session_name: sname || `Count - ${name}`, status: 'In Progress' }).select().single();
+      const { data } = await supabase.from('stock_count_sessions').insert({ upload_id: activeUploadId, brand: name, session_name: sname || `Count - ${name}`, status: 'In Progress', agency_id: profile?.agency_id }).select().single();
       if (data) sid = data.id;
     }
     if (sid) navigate(`/count/${sid}`);
