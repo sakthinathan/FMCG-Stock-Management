@@ -20,34 +20,48 @@ export function Issues() {
   const [sort, setSort] = useState<'variance' | 'value'>('variance');
   const [brands, setBrands] = useState<string[]>([]);
 
+  const fetchIssues = async () => {
+    if (!activeUploadId) { setLoading(false); return; }
+    try {
+      setLoading(true);
+      const { data: counts } = await supabase.from('physical_stock_counts').select('*, system_stock_snapshots!inner(*)').eq('system_stock_snapshots.upload_id', activeUploadId).neq('variance', 0);
+      const bSet = new Set<string>();
+      const fmt: IssueItem[] = (counts || []).map((c: any) => {
+        const s = c.system_stock_snapshots;
+        if (s.brand) bSet.add(s.brand);
+        const getTrend = (curr: number, prev: number) => {
+          if (prev === 0 && curr !== 0) return 'New Issue';
+          if (curr !== 0 && prev !== 0) return Math.abs(curr) > Math.abs(prev) ? 'Increased' : Math.abs(curr) < Math.abs(prev) ? 'Decreased' : 'Unchanged';
+          return 'Resolved';
+        };
+        return { id: c.id, material: s.material, desc: s.material_desc, brand: s.brand, mrp: s.mrp, sysQty: s.system_qty_pcs, phyQty: c.physical_total_pcs, variance: c.variance, status: c.status, notes: c.notes, reasonCode: c.reason_code, trend: getTrend(c.variance, s.prev_variance || 0) };
+      });
+      setBrands(Array.from(bSet).sort());
+      setIssues(fmt);
+    } catch (e) { console.error(e); }
+    finally { setLoading(false); }
+  };
+
   useEffect(() => {
-    async function load() {
-      if (!activeUploadId) { setLoading(false); return; }
-      try {
-        setLoading(true);
-        const { data: counts } = await supabase.from('physical_stock_counts').select('*, system_stock_snapshots!inner(*)').eq('system_stock_snapshots.upload_id', activeUploadId).neq('variance', 0);
-        const bSet = new Set<string>();
-        const fmt: IssueItem[] = (counts || []).map((c: any) => {
-          const s = c.system_stock_snapshots;
-          if (s.brand) bSet.add(s.brand);
-          const getTrend = (curr: number, prev: number) => {
-            if (prev === 0 && curr !== 0) return 'New Issue';
-            if (curr !== 0 && prev !== 0) return Math.abs(curr) > Math.abs(prev) ? 'Increased' : Math.abs(curr) < Math.abs(prev) ? 'Decreased' : 'Unchanged';
-            return 'Resolved';
-          };
-          return { id: c.id, material: s.material, desc: s.material_desc, brand: s.brand, mrp: s.mrp, sysQty: s.system_qty_pcs, phyQty: c.physical_total_pcs, variance: c.variance, status: c.status, notes: c.notes, reasonCode: c.reason_code, trend: getTrend(c.variance, s.prev_variance || 0) };
-        });
-        setBrands(Array.from(bSet).sort());
-        setIssues(fmt);
-      } catch (e) { console.error(e); }
-      finally { setLoading(false); }
-    }
-    load();
-    const ch = supabase.channel('issues').on('postgres_changes', { event: '*', schema: 'public', table: 'physical_stock_counts' }, load).subscribe();
+    fetchIssues();
+    const ch = supabase.channel('issues').on('postgres_changes', { event: '*', schema: 'public', table: 'physical_stock_counts' }, fetchIssues).subscribe();
     return () => { supabase.removeChannel(ch); };
   }, [activeUploadId]);
 
-  const handleRecount = async (id: string) => { await supabase.from('physical_stock_counts').delete().eq('id', id); };
+  const handleRecount = async (id: string) => {
+    // Optimistic UI update
+    setIssues(prev => prev.filter(item => item.id !== id));
+    try {
+      const { error } = await supabase.from('physical_stock_counts').delete().eq('id', id);
+      if (error) {
+        console.error(error);
+        fetchIssues();
+      }
+    } catch (e) {
+      console.error(e);
+      fetchIssues();
+    }
+  };
 
   const filtered = issues
     .filter(i => brand === 'All' || i.brand === brand)

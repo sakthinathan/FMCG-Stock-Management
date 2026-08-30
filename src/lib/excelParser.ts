@@ -39,19 +39,42 @@ export const parseExcelFile = async (file: File): Promise<ParseResult> => {
         let filteredZeroQty = 0;
         const errors: string[] = [];
 
-        rawData.forEach((row, index) => {
-          // Map to Britannia Excel Columns
-          const material = row['Material'] || row['Material Code'] || row['material'];
-          const description = row['Material Desc'] || row['Description'] || row['description'];
-          const brand = row['Brand Desc'] || row['Brand'] || row['brand'] || 'Unknown Brand';
-          const mrp = parseFloat(row['MRP'] || row['mrp'] || '0');
-          const goodQty = parseFloat(row['Good Qty'] || row['good_qty'] || row['Good Quantity'] || '0');
-          
-          // Conversion handling: Britannia uses 'Conversion' (e.g. 1), 'Conversion_1' (e.g. NOS), 'Conversion_2' (e.g. 96), 'Conversion_3' (e.g. PAK)
-          // We need the numeric multiplier, which is usually in Conversion_2 if it exists, otherwise fallback to Conversion
-          let conversion = parseInt(row['Conversion_2'], 10);
-          if (isNaN(conversion) || conversion <= 0) {
-            conversion = parseInt(row['Conversion'] || row['conversion'] || '1', 10);
+        rawData.forEach((originalRow, index) => {
+          // Normalize row keys to lowercase and trimmed
+          const row: any = {};
+          Object.keys(originalRow).forEach(k => {
+            row[k.trim().toLowerCase()] = originalRow[k];
+          });
+
+          // Map to normalized columns
+          const material = row['material'] || row['material code'] || row['material_code'];
+          const description = row['material desc'] || row['material description'] || row['description'] || row['material_desc'];
+          const brand = row['brand desc'] || row['brand description'] || row['brand'] || row['brand_desc'] || 'Unknown Brand';
+          const mrp = parseFloat(row['mrp'] || '0');
+
+          // Robust conversion factor extraction
+          let conversion = 1;
+          const convValues: number[] = [];
+          Object.keys(row).forEach(key => {
+            if (key.includes('conversion')) {
+              const val = parseInt(row[key], 10);
+              if (!isNaN(val) && val > 0) {
+                convValues.push(val);
+              }
+            }
+          });
+          if (convValues.length > 0) {
+            conversion = Math.max(...convValues);
+          }
+
+          // Fetch goodQty with fallback to Stock in CBB / Stock in PKT
+          let goodQty = parseFloat(row['good qty'] || row['good_qty'] || row['good quantity'] || row['good_quantity'] || '0');
+          if (isNaN(goodQty) || goodQty <= 0) {
+            const stockCbb = parseFloat(row['stock in cbb'] || row['stock_in_cbb'] || '0');
+            const stockPkt = parseFloat(row['stock in pkt'] || row['stock_in_pkt'] || '0');
+            if (!isNaN(stockCbb) && !isNaN(stockPkt) && (stockCbb > 0 || stockPkt > 0)) {
+              goodQty = (stockCbb * conversion) + stockPkt;
+            }
           }
 
           if (!material) {
@@ -70,7 +93,7 @@ export const parseExcelFile = async (file: File): Promise<ParseResult> => {
             brand: String(brand),
             mrp: isNaN(mrp) ? 0 : mrp,
             goodQty: isNaN(goodQty) ? 0 : goodQty,
-            conversion: isNaN(conversion) || conversion <= 0 ? 1 : conversion,
+            conversion: conversion,
             systemQtyPcs: isNaN(goodQty) ? 0 : Math.round(goodQty),
             prevVariance: Math.floor(Math.random() * 50) - 25, // Mock previous variance between -25 and +25 for testing
           });

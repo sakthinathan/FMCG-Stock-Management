@@ -45,12 +45,12 @@ export function UploadStock() {
         const { data: lastUploads } = await supabase.from('stock_uploads').select('id').order('uploaded_at', { ascending: false }).limit(2);
         if (lastUploads && lastUploads.length > 1) {
           const prevId = lastUploads[1].id;
-          const { data: prevSnaps } = await supabase.from('system_stock_snapshots').select('id, material').eq('upload_id', prevId);
+          const { data: prevSnaps } = await supabase.from('system_stock_snapshots').select('id, material, mrp').eq('upload_id', prevId);
           if (prevSnaps) {
             const { data: prevCounts } = await supabase.from('physical_stock_counts').select('snapshot_id, variance');
             if (prevCounts) {
               const cm = new Map(prevCounts.map(c => [c.snapshot_id, c.variance]));
-              prevSnaps.forEach(s => { if (cm.has(s.id)) prevVariances.set(s.material, cm.get(s.id)); });
+              prevSnaps.forEach(s => { if (cm.has(s.id)) prevVariances.set(`${s.material}_${s.mrp}`, cm.get(s.id)); });
             }
           }
         }
@@ -59,7 +59,7 @@ export function UploadStock() {
       const rows = result.products.map(p => ({
         upload_id: uploadData.id, material: p.material, material_desc: p.description,
         brand: p.brand, mrp: p.mrp, good_qty: p.goodQty, conversion: p.conversion,
-        system_qty_pcs: p.systemQtyPcs, prev_variance: prevVariances.get(p.material) || 0,
+        system_qty_pcs: p.systemQtyPcs, prev_variance: prevVariances.get(`${p.material}_${p.mrp}`) || 0,
       }));
       const { error: snapErr } = await supabase.from('system_stock_snapshots').insert(rows);
       if (snapErr) throw snapErr;

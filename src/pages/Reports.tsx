@@ -158,7 +158,7 @@ export function Reports() {
           snapshotsA?.forEach(snapA => {
             if (selectedBrand !== 'All Brands' && snapA.brand !== selectedBrand) return;
 
-            const snapB = snapshotsB?.find(x => x.material === snapA.material);
+            const snapB = snapshotsB?.find(x => x.material === snapA.material && x.mrp === snapA.mrp);
             const countA = fullCountMapA.get(snapA.id);
             const countB = snapB ? countMapB.get(snapB.id) : null;
 
@@ -596,7 +596,7 @@ export function Reports() {
                     </thead>
                     <tbody>
                       {comparisonRows.map((r, idx) => (
-                        <tr key={r.material} style={{ borderBottom: '1px solid #f1f5f9', background: idx % 2 === 0 ? '#fff' : '#f8fafc' }}>
+                        <tr key={`${r.material}_${r.mrp}`} style={{ borderBottom: '1px solid #f1f5f9', background: idx % 2 === 0 ? '#fff' : '#f8fafc' }}>
                           <td style={{ padding: '12px 16px', textAlign: 'left' }}>
                             <div style={{ fontWeight: 700, color: '#0f172a' }}>{r.material}</div>
                             <div style={{ fontSize: 11, color: '#64748b', maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.description}</div>
