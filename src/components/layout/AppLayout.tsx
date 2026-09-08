@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import {
   PackageSearch, UploadCloud, LayoutDashboard, Settings,
-  AlertTriangle, FileText, LogOut, ListChecks, Search, Menu, X, ChevronRight
+  AlertTriangle, FileText, LogOut, ListChecks, Search, Menu, X, ChevronRight,
+  User, ChevronDown, Building
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -68,11 +69,23 @@ export function AppLayout() {
   const location = useLocation();
   const { filename } = useStockStore();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const userMenuRef = useRef<HTMLDivElement>(null);
   const [time, setTime] = useState(new Date());
 
   useEffect(() => {
     const timer = setInterval(() => setTime(new Date()), 1000);
     return () => clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
+        setUserMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
   const handleLogout = async () => { await signOut(); navigate('/login'); };
@@ -239,14 +252,73 @@ export function AppLayout() {
               </span>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <div style={{ textAlign: 'right' }} className="user-text">
-                <p style={{ fontSize: 12, fontWeight: 600, color: '#f1f5f9', margin: 0 }}>{user?.email?.split('@')[0] || 'Admin'}</p>
-                <p style={{ fontSize: 10, color: '#94a3b8', margin: 0 }}>{profile?.role || 'Administrator'}</p>
-              </div>
-              <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'linear-gradient(135deg, #4f46e5, #7c3aed)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: 13, flexShrink: 0 }}>
-                {user?.email?.[0]?.toUpperCase() || 'A'}
-              </div>
+            <div style={{ position: 'relative' }} ref={userMenuRef}>
+              <button
+                onClick={() => setUserMenuOpen(!userMenuOpen)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 8, background: 'transparent',
+                  border: 'none', cursor: 'pointer', padding: '4px 8px', borderRadius: 8,
+                  transition: 'background 0.15s ease', outline: 'none'
+                }}
+                onMouseEnter={e => (e.currentTarget.style.background = '#1e293b')}
+                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+              >
+                <div style={{ textAlign: 'right' }} className="user-text">
+                  <p style={{ fontSize: 12, fontWeight: 600, color: '#f1f5f9', margin: 0 }}>{user?.email?.split('@')[0] || 'Admin'}</p>
+                  <p style={{ fontSize: 10, color: '#94a3b8', margin: 0 }}>{profile?.role || 'Administrator'}</p>
+                </div>
+                <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'linear-gradient(135deg, #4f46e5, #7c3aed)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: 13, flexShrink: 0 }}>
+                  {user?.email?.[0]?.toUpperCase() || 'A'}
+                </div>
+                <ChevronDown size={14} color="#94a3b8" style={{ transform: userMenuOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }} />
+              </button>
+
+              {/* Dropdown Menu */}
+              {userMenuOpen && (
+                <div style={{
+                  position: 'absolute', top: 48, right: 0, width: 240, background: '#fff',
+                  borderRadius: 12, boxShadow: '0 10px 25px -5px rgba(0,0,0,0.15), 0 8px 10px -6px rgba(0,0,0,0.1)',
+                  border: '1px solid #e2e8f0', zIndex: 60, padding: '6px'
+                }}>
+                  <div style={{ padding: '10px 12px 8px', borderBottom: '1px solid #f1f5f9' }}>
+                    <p style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user?.email || 'admin@thulir.com'}</p>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
+                      <span style={{ fontSize: 10, fontWeight: 600, background: '#eef2ff', color: '#4f46e5', padding: '2px 6px', borderRadius: 4 }}>{profile?.role || 'Administrator'}</span>
+                      <span style={{ fontSize: 10, color: '#64748b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{agency?.name || 'THULIR AGENCY'}</span>
+                    </div>
+                  </div>
+
+                  <div style={{ padding: '4px 0' }}>
+                    <button
+                      onClick={() => { setUserMenuOpen(false); navigate('/settings'); }}
+                      style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 9, padding: '8px 10px', border: 'none', background: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, color: '#334155', fontWeight: 500, fontFamily: 'inherit' }}
+                      onMouseEnter={e => (e.currentTarget.style.background = '#f8fafc')}
+                      onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+                    >
+                      <User size={15} color="#64748b" /> Profile & Agency
+                    </button>
+                    <button
+                      onClick={() => { setUserMenuOpen(false); navigate('/settings'); }}
+                      style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 9, padding: '8px 10px', border: 'none', background: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, color: '#334155', fontWeight: 500, fontFamily: 'inherit' }}
+                      onMouseEnter={e => (e.currentTarget.style.background = '#f8fafc')}
+                      onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+                    >
+                      <Settings size={15} color="#64748b" /> System Settings
+                    </button>
+                  </div>
+
+                  <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: 4 }}>
+                    <button
+                      onClick={() => { setUserMenuOpen(false); handleLogout(); }}
+                      style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 9, padding: '8px 10px', border: 'none', background: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, color: '#ef4444', fontWeight: 600, fontFamily: 'inherit' }}
+                      onMouseEnter={e => (e.currentTarget.style.background = '#fef2f2')}
+                      onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+                    >
+                      <LogOut size={15} color="#ef4444" /> Sign Out
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </header>
