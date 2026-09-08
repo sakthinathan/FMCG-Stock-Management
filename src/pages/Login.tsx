@@ -17,6 +17,61 @@ export function Login() {
   const [verifyingAgency, setVerifyingAgency] = useState(false);
   const [agencyNotFound, setAgencyNotFound] = useState(false);
 
+  // Reset Password Modal State
+  const [showResetModal, setShowResetModal] = useState(false);
+  const [resetAwCode, setResetAwCode] = useState('');
+  const [resetMobile, setResetMobile] = useState('');
+  const [resetPassword, setResetPassword] = useState('');
+  const [resetConfirmPassword, setResetConfirmPassword] = useState('');
+  const [resetLoading, setResetLoading] = useState(false);
+  const [resetError, setResetError] = useState<string | null>(null);
+  const [resetSuccess, setResetSuccess] = useState<string | null>(null);
+
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setResetError(null);
+    setResetSuccess(null);
+
+    const cleanCode = resetAwCode.trim().toUpperCase();
+    const cleanMobile = resetMobile.trim();
+
+    if (!cleanCode || !cleanMobile) {
+      setResetError('Please enter both AW Code and Registered Mobile Number.');
+      return;
+    }
+
+    if (resetPassword !== resetConfirmPassword) {
+      setResetError('Passwords do not match. Please verify.');
+      return;
+    }
+
+    if (resetPassword.length < 6) {
+      setResetError('Password must be at least 6 characters long.');
+      return;
+    }
+
+    setResetLoading(true);
+    try {
+      const { data, error } = await supabase.rpc('reset_agency_password', {
+        p_aw_code: cleanCode,
+        p_mobile: cleanMobile,
+        p_new_password: resetPassword
+      });
+
+      if (error) throw error;
+
+      setResetSuccess('Password reset successfully! You can now log in with your new password.');
+      setTimeout(() => {
+        setShowResetModal(false);
+        setAwCode(cleanCode);
+      }, 1500);
+    } catch (err: any) {
+      setResetError(err.message || 'Failed to reset password. Please check your AW Code and Mobile No.');
+    } finally {
+      setResetLoading(false);
+    }
+  };
+
   // Pre-fill registered AW Code if coming from signup
   useEffect(() => {
     if (location.state?.registeredAwCode) {
@@ -187,11 +242,20 @@ export function Login() {
             </div>
           )}
 
-          {/* Password Input */}
+          {/* Password Input Header with Forgot Link */}
           <div>
-            <label style={{ fontSize: 12, fontWeight: 700, color: '#374151', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: 6 }}>
-              Password
-            </label>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+              <label style={{ fontSize: 12, fontWeight: 700, color: '#374151', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                Password
+              </label>
+              <button
+                type="button"
+                onClick={() => { setShowResetModal(true); setResetError(null); setResetSuccess(null); }}
+                style={{ border: 'none', background: 'none', color: '#e52321', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}
+              >
+                Forgot Password?
+              </button>
+            </div>
             <div style={{ position: 'relative' }}>
               <Lock size={15} color="#94a3b8" style={{ position: 'absolute', left: 13, top: '50%', transform: 'translateY(-50%)' }} />
               <input
@@ -233,6 +297,82 @@ export function Login() {
           New Distributor Agency? <Link to="/signup" style={{ color: '#e52321', fontWeight: 700, textDecoration: 'none' }}>Register New Agency</Link>
         </div>
       </div>
+
+      {/* Forgot Password Modal */}
+      {showResetModal && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+          <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }} onClick={() => setShowResetModal(false)} />
+          <div style={{ position: 'relative', width: '100%', maxWidth: 400, background: '#fff', borderRadius: 20, padding: '24px 24px', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.3)', border: '1px solid #fecaca', zIndex: 101 }}>
+            <h3 style={{ fontSize: 18, fontWeight: 800, color: '#0f172a', margin: '0 0 4px', textTransform: 'uppercase' }}>Reset Password</h3>
+            <p style={{ fontSize: 12, color: '#64748b', margin: '0 0 16px' }}>Verify your AW Code and Registered Mobile Number</p>
+
+            {resetError && (
+              <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 8, padding: '8px 12px', marginBottom: 14, color: '#dc2626', fontSize: 12, fontWeight: 600 }}>
+                {resetError}
+              </div>
+            )}
+
+            {resetSuccess && (
+              <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, padding: '10px 12px', marginBottom: 14, color: '#16a34a', fontSize: 12, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <CheckCircle2 size={16} /> {resetSuccess}
+              </div>
+            )}
+
+            <form onSubmit={handleResetPassword} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 700, color: '#475569', textTransform: 'uppercase' }}>AW Code *</label>
+                <input
+                  type="text" required placeholder="e.g. AW100234"
+                  value={resetAwCode} onChange={e => setResetAwCode(e.target.value.toUpperCase())}
+                  style={{ width: '100%', height: 40, border: '1.5px solid #e2e8f0', borderRadius: 8, padding: '0 12px', fontSize: 13, fontWeight: 700, outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }}
+                />
+              </div>
+
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 700, color: '#475569', textTransform: 'uppercase' }}>Registered Mobile No *</label>
+                <input
+                  type="tel" required placeholder="9876543210" maxLength={10}
+                  value={resetMobile} onChange={e => setResetMobile(e.target.value.replace(/\D/g, ''))}
+                  style={{ width: '100%', height: 40, border: '1.5px solid #e2e8f0', borderRadius: 8, padding: '0 12px', fontSize: 13, outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }}
+                />
+              </div>
+
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 700, color: '#475569', textTransform: 'uppercase' }}>New Password *</label>
+                <input
+                  type="password" required placeholder="••••••••"
+                  value={resetPassword} onChange={e => setResetPassword(e.target.value)}
+                  style={{ width: '100%', height: 40, border: '1.5px solid #e2e8f0', borderRadius: 8, padding: '0 12px', fontSize: 13, outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }}
+                />
+              </div>
+
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 700, color: '#475569', textTransform: 'uppercase' }}>Confirm New Password *</label>
+                <input
+                  type="password" required placeholder="••••••••"
+                  value={resetConfirmPassword} onChange={e => setResetConfirmPassword(e.target.value)}
+                  style={{ width: '100%', height: 40, border: '1.5px solid #e2e8f0', borderRadius: 8, padding: '0 12px', fontSize: 13, outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
+                <button
+                  type="button" onClick={() => setShowResetModal(false)}
+                  style={{ flex: 1, height: 42, background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: 10, color: '#475569', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit" disabled={resetLoading}
+                  style={{ flex: 1, height: 42, background: resetLoading ? '#991b1b' : '#e52321', border: 'none', borderRadius: 10, color: '#fff', fontSize: 13, fontWeight: 700, cursor: resetLoading ? 'not-allowed' : 'pointer', fontFamily: 'inherit', textTransform: 'uppercase' }}
+                >
+                  {resetLoading ? 'Saving...' : 'Reset Password'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       <p style={{ marginTop: 24, fontSize: 11, color: '#fca5a5', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
         Britannia FMCG Stock Audit Platform

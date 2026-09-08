@@ -167,3 +167,60 @@ DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
+-- 8. RPC Function to Reset Distributor Password via AW Code and Registered Mobile Number Verification
+CREATE OR REPLACE FUNCTION public.reset_agency_password(
+    p_aw_code TEXT,
+    p_mobile TEXT,
+    p_new_password TEXT
+)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, auth, extensions
+AS $$
+DECLARE
+    v_agency_id UUID;
+    v_user_id UUID;
+    v_clean_code TEXT;
+    v_internal_email TEXT;
+BEGIN
+    v_clean_code := UPPER(TRIM(p_aw_code));
+    
+    -- Find agency by AW Code and Mobile Number
+    SELECT id INTO v_agency_id
+    FROM public.agencies
+    WHERE UPPER(aw_code) = v_clean_code
+      AND mobile = TRIM(p_mobile);
+
+    IF v_agency_id IS NULL THEN
+        RAISE EXCEPTION 'Invalid AW Code or Registered Mobile Number.';
+    END IF;
+
+    -- Find user profile
+    SELECT id INTO v_user_id
+    FROM public.profiles
+    WHERE agency_id = v_agency_id
+    LIMIT 1;
+
+    IF v_user_id IS NULL THEN
+        v_internal_email := 'aw' || LOWER(REGEXP_REPLACE(v_clean_code, '[^a-zA-Z0-9]', '', 'g')) || '@britanniaaudit.com';
+        SELECT id INTO v_user_id
+        FROM auth.users
+        WHERE email = v_internal_email;
+    END IF;
+
+    IF v_user_id IS NULL THEN
+        RAISE EXCEPTION 'Associated user account not found.';
+    END IF;
+
+    -- Update encrypted_password in auth.users using pgcrypto
+    UPDATE auth.users
+    SET encrypted_password = crypt(p_new_password, gen_salt('bf'))
+    WHERE id = v_user_id;
+
+    RETURN TRUE;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.reset_agency_password(TEXT, TEXT, TEXT) TO anon, authenticated;
