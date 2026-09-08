@@ -1,39 +1,34 @@
 import React, { useState, useEffect } from 'react';
 import {
-  FileDown, FileSpreadsheet, Download, Loader2, FileText,
-  TrendingUp, AlertCircle, History, Building2, CheckCircle2,
-  Layers, ArrowUpRight, ArrowDownRight, UploadCloud, Calendar
+  FileSpreadsheet, Download, FileText, History,
+  Building2, Layers, Calendar
 } from 'lucide-react';
 import { useStockStore } from '@/store/useStockStore';
 import { supabase } from '@/lib/supabase';
-import * as XLSX from 'xlsx';
-import jsPDF from 'jspdf';
-import 'jspdf-autotable';
-import { useNavigate } from 'react-router-dom';
-
-type ReportType = 'full' | 'shortage' | 'excess' | 'increased_variance' | 'new_issues' | 'historical_comparison' | 'brand_summary';
+import { LoadingSpinner } from '@/components/common/LoadingSpinner';
+import { PageHeader } from '@/components/common/PageHeader';
+import { StatusBadge } from '@/components/common/StatusBadge';
+import { exportDataToExcel, exportReportToPdf, type ReportType } from '@/lib/reportExportUtils';
 
 interface BrandSummaryItem {
-  brand: string; totalSkus: number; countedSkus: number;
-  systemQtyPcs: number; physicalQtyPcs: number; systemValue: number; physicalValue: number;
-  netVariancePcs: number; netVarianceValue: number; shortageCount: number; excessCount: number; resolvedCount: number;
+  brand: string;
+  totalSkus: number;
+  countedSkus: number;
+  systemQtyPcs: number;
+  physicalQtyPcs: number;
+  systemValue: number;
+  physicalValue: number;
+  netVariancePcs: number;
+  netVarianceValue: number;
+  shortageCount: number;
+  excessCount: number;
+  resolvedCount: number;
 }
 
 const W: React.CSSProperties = { background: '#fff', borderRadius: 12, boxShadow: '0 1px 3px rgba(0,0,0,0.06)' };
 
-const btn = (primary = true, disabled = false): React.CSSProperties => ({
-  display: 'inline-flex', alignItems: 'center', gap: 7, padding: '9px 18px',
-  borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: disabled ? 'not-allowed' : 'pointer',
-  border: 'none', fontFamily: 'inherit',
-  background: primary ? (disabled ? '#a5b4fc' : '#4f46e5') : (disabled ? '#f8fafc' : '#fff'),
-  color: primary ? '#fff' : '#374151',
-  ...(primary ? {} : { border: '1px solid #e2e8f0' }),
-  opacity: disabled ? 0.7 : 1,
-});
-
 export function Reports() {
-  const navigate = useNavigate();
-  const { activeUploadId, clearActiveUpload } = useStockStore();
+  const { activeUploadId } = useStockStore();
   
   // Selection and Filter States
   const [uploads, setUploads] = useState<any[]>([]);
@@ -48,7 +43,16 @@ export function Reports() {
   const [uniqueBrands, setUniqueBrands] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [brandSummaries, setBrandSummaries] = useState<BrandSummaryItem[]>([]);
-  const [overallStats, setOverallStats] = useState({ totalSkus: 0, countedSkus: 0, systemValue: 0, physicalValue: 0, shortageValue: 0, excessValue: 0, shortageItems: 0, excessItems: 0 });
+  const [overallStats, setOverallStats] = useState({
+    totalSkus: 0,
+    countedSkus: 0,
+    systemValue: 0,
+    physicalValue: 0,
+    shortageValue: 0,
+    excessValue: 0,
+    shortageItems: 0,
+    excessItems: 0
+  });
   const [comparisonRows, setComparisonRows] = useState<any[]>([]);
 
   // 1. Fetch upload history
@@ -61,7 +65,6 @@ export function Reports() {
           .order('uploaded_at', { ascending: false });
         if (data) {
           setUploads(data);
-          // Default to active upload, fallback to the most recent one
           if (activeUploadId && data.some(x => x.id === activeUploadId)) {
             setSelectedUploadId(activeUploadId);
           } else if (data.length > 0) {
@@ -102,11 +105,15 @@ export function Reports() {
       try {
         setLoading(true);
 
-        // Fetch snapshots and counts for Primary upload
-        const { data: snapshotsA } = await supabase.from('system_stock_snapshots').select('*').eq('upload_id', selectedUploadId);
-        const { data: countsA } = await supabase.from('physical_stock_counts').select('*');
-        
-        // Build active count map considering the session filter
+        const { data: snapshotsA } = await supabase
+          .from('system_stock_snapshots')
+          .select('*')
+          .eq('upload_id', selectedUploadId);
+
+        const { data: countsA } = await supabase
+          .from('physical_stock_counts')
+          .select('*');
+
         const countMapA = new Map();
         if (selectedSessionId !== 'All') {
           countsA?.filter(c => c.session_id === selectedSessionId).forEach(c => countMapA.set(c.snapshot_id, c));
@@ -121,18 +128,39 @@ export function Reports() {
         snapshotsA?.forEach(snap => {
           const b = snap.brand || 'Unbranded';
           brandsSet.add(b);
-          if (!brandMap.has(b)) brandMap.set(b, { brand: b, totalSkus: 0, countedSkus: 0, systemQtyPcs: 0, physicalQtyPcs: 0, systemValue: 0, physicalValue: 0, netVariancePcs: 0, netVarianceValue: 0, shortageCount: 0, excessCount: 0, resolvedCount: 0 });
+          if (!brandMap.has(b)) {
+            brandMap.set(b, {
+              brand: b,
+              totalSkus: 0,
+              countedSkus: 0,
+              systemQtyPcs: 0,
+              physicalQtyPcs: 0,
+              systemValue: 0,
+              physicalValue: 0,
+              netVariancePcs: 0,
+              netVarianceValue: 0,
+              shortageCount: 0,
+              excessCount: 0,
+              resolvedCount: 0
+            });
+          }
           const e = brandMap.get(b)!;
           e.totalSkus++;
           const mrp = Number(snap.mrp) || 0, sysPcs = Number(snap.system_qty_pcs) || 0;
-          e.systemQtyPcs += sysPcs; e.systemValue += sysPcs * mrp; totalSysVal += sysPcs * mrp;
+          e.systemQtyPcs += sysPcs;
+          e.systemValue += sysPcs * mrp;
+          totalSysVal += sysPcs * mrp;
           
           const count = countMapA.get(snap.id);
           if (count) {
-            e.countedSkus++; totalCounted++;
+            e.countedSkus++;
+            totalCounted++;
             const phyPcs = Number(count.physical_total_pcs) || 0, variance = Number(count.variance) || 0, prevVariance = Number(snap.prev_variance) || 0;
-            e.physicalQtyPcs += phyPcs; e.physicalValue += phyPcs * mrp; totalPhyVal += phyPcs * mrp;
-            e.netVariancePcs += variance; e.netVarianceValue += variance * mrp;
+            e.physicalQtyPcs += phyPcs;
+            e.physicalValue += phyPcs * mrp;
+            totalPhyVal += phyPcs * mrp;
+            e.netVariancePcs += variance;
+            e.netVarianceValue += variance * mrp;
             if (variance < 0) { e.shortageCount++; totalShortageCount++; totalShortageVal += Math.abs(variance * mrp); }
             else if (variance > 0) { e.excessCount++; totalExcessCount++; totalExcessVal += variance * mrp; }
             else if (variance === 0 && prevVariance !== 0) e.resolvedCount++;
@@ -140,14 +168,22 @@ export function Reports() {
         });
         setUniqueBrands(Array.from(brandsSet).sort());
         setBrandSummaries(Array.from(brandMap.values()).sort((a, b) => b.systemValue - a.systemValue));
-        setOverallStats({ totalSkus: snapshotsA?.length || 0, countedSkus: totalCounted, systemValue: totalSysVal, physicalValue: totalPhyVal, shortageValue: totalShortageVal, excessValue: totalExcessVal, shortageItems: totalShortageCount, excessItems: totalExcessCount });
+        setOverallStats({
+          totalSkus: snapshotsA?.length || 0,
+          countedSkus: totalCounted,
+          systemValue: totalSysVal,
+          physicalValue: totalPhyVal,
+          shortageValue: totalShortageVal,
+          excessValue: totalExcessVal,
+          shortageItems: totalShortageCount,
+          excessItems: totalExcessCount
+        });
 
-        // If comparison mode is active, fetch secondary upload data and compute parallel deltas
+        // Comparison mode calculation
         if (compareMode && compareUploadId) {
           const { data: snapshotsB } = await supabase.from('system_stock_snapshots').select('*').eq('upload_id', compareUploadId);
           const { data: countsB } = await supabase.from('physical_stock_counts').select('*');
           
-          // Count map for primary upload (including full items matching snapshots A)
           const fullCountMapA = new Map();
           countsA?.forEach(c => fullCountMapA.set(c.snapshot_id, c));
 
@@ -175,7 +211,7 @@ export function Reports() {
               material: snapA.material,
               description: snapA.material_desc,
               brand: snapA.brand,
-              mrp: mrp,
+              mrp,
               sysA, phyA, varA,
               sysB, phyB, varB,
               deltaCount: phyB - phyA,
@@ -184,8 +220,11 @@ export function Reports() {
           });
           setComparisonRows(compRows);
         }
-      } catch (e) { console.error(e); }
-      finally { setLoading(false); }
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setLoading(false);
+      }
     }
     loadData();
   }, [selectedUploadId, compareUploadId, compareMode, selectedSessionId, selectedBrand]);
@@ -203,7 +242,9 @@ export function Reports() {
     }
 
     if (type === 'brand_summary') {
-      return brandSummaries.filter(b => selectedBrand === 'All Brands' || b.brand === selectedBrand).map(b => ({
+      return brandSummaries
+        .filter((b: BrandSummaryItem) => selectedBrand === 'All Brands' || b.brand === selectedBrand)
+        .map((b: BrandSummaryItem) => ({
         'Brand': b.brand, 'Total SKUs': b.totalSkus, 'Counted SKUs': b.countedSkus,
         'Progress %': b.totalSkus > 0 ? `${((b.countedSkus / b.totalSkus) * 100).toFixed(1)}%` : '0%',
         'System Qty (PCS)': b.systemQtyPcs, 'Physical Qty (PCS)': b.physicalQtyPcs,
@@ -229,13 +270,31 @@ export function Reports() {
         else if (Math.abs(variance) > Math.abs(prevVariance)) trend = 'Increased Variance';
         else if (Math.abs(variance) < Math.abs(prevVariance)) trend = 'Decreased Variance';
       }
-      const row = { 'Material': snap.material, 'Description': snap.material_desc, 'Brand': snap.brand, 'MRP (₹)': mrp, 'System Qty (PCS)': sysPcs, 'Physical Qty (PCS)': count ? phyPcs : 'Not Counted', 'Variance (PCS)': count ? variance : '', 'Variance Value (₹)': count ? ((variance || 0) * mrp).toFixed(2) : '', 'Status': status, 'Reason Code': count?.reason_code || '', 'Notes': count?.notes || '', 'Previous Variance (PCS)': prevVariance, 'Trend': trend };
+      const row = {
+        'Material': snap.material,
+        'Description': snap.material_desc,
+        'Brand': snap.brand,
+        'MRP (₹)': mrp,
+        'System Qty (PCS)': sysPcs,
+        'Physical Qty (PCS)': count ? phyPcs : 'Not Counted',
+        'Variance (PCS)': count ? variance : '',
+        'Variance Value (₹)': count ? ((variance || 0) * mrp).toFixed(2) : '',
+        'Status': status,
+        'Reason Code': count?.reason_code || '',
+        'Notes': count?.notes || '',
+        'Previous Variance (PCS)': prevVariance,
+        'Trend': trend
+      };
       if (type === 'full') rows.push(row);
       else if (type === 'shortage' && count && status === 'Shortage') rows.push(row);
       else if (type === 'excess' && count && status === 'Excess') rows.push(row);
       else if (type === 'increased_variance' && count && Math.abs(variance || 0) > Math.abs(prevVariance) && (variance || 0) !== 0) rows.push(row);
       else if (type === 'new_issues' && count && prevVariance === 0 && (variance || 0) !== 0) rows.push(row);
-      else if (type === 'historical_comparison' && count) rows.push({ 'Material': snap.material, 'Description': snap.material_desc, 'Brand': snap.brand, 'MRP (₹)': mrp, 'System Qty (PCS)': sysPcs, 'Physical Qty (PCS)': phyPcs, 'Previous Variance (PCS)': prevVariance, 'Current Variance (PCS)': variance, 'Trend': trend });
+      else if (type === 'historical_comparison' && count) rows.push({
+        'Material': snap.material, 'Description': snap.material_desc, 'Brand': snap.brand, 'MRP (₹)': mrp,
+        'System Qty (PCS)': sysPcs, 'Physical Qty (PCS)': phyPcs, 'Previous Variance (PCS)': prevVariance,
+        'Current Variance (PCS)': variance, 'Trend': trend
+      });
     });
     return rows;
   };
@@ -244,399 +303,259 @@ export function Reports() {
     setDownloadingType(type);
     try {
       const data = await fetchReportData(type);
-      if (!data || data.length === 0) { alert('No records match this report.'); return; }
-      const ws = XLSX.utils.json_to_sheet(data), wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, type.replace(/_/g, ' '));
-      const dateStr = new Date().toISOString().split('T')[0];
-      const brandSuffix = selectedBrand !== 'All Brands' ? `_${selectedBrand.replace(/\s+/g, '_')}` : '';
-      XLSX.writeFile(wb, `${type}${brandSuffix}_${dateStr}.xlsx`);
-    } catch (e) { alert('Failed to generate report.'); }
-    finally { setDownloadingType(null); }
-  };
-
-  const handleDownloadComparisonExcel = () => {
-    if (!selectedUploadId || !compareUploadId) return;
-    setDownloadingType('comparison');
-    try {
-      const data = comparisonRows.map(r => ({
-        'Material': r.material, 'Description': r.description, 'Brand': r.brand, 'MRP (₹)': r.mrp,
-        'Audit A System (PCS)': r.sysA, 'Audit A Counted (PCS)': r.phyA, 'Audit A Variance (PCS)': r.varA,
-        'Audit B System (PCS)': r.sysB, 'Audit B Counted (PCS)': r.phyB, 'Audit B Variance (PCS)': r.varB,
-        'Variance Delta (PCS)': r.deltaCount, 'Value Delta (₹)': r.deltaValue.toFixed(2)
-      }));
-      if (data.length === 0) { alert('No comparison records available.'); return; }
-      const ws = XLSX.utils.json_to_sheet(data), wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, 'Parallel Comparison');
-      XLSX.writeFile(wb, `Parallel_Comparison_${selectedBrand.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.xlsx`);
+      if (!data || data.length === 0) {
+        alert('No records match this report.');
+        return;
+      }
+      exportDataToExcel(data, type);
     } catch (e) {
-      alert('Failed to generate comparison report.');
+      console.error(e);
+      alert('Failed to generate Excel report.');
     } finally {
       setDownloadingType(null);
     }
   };
 
-  const handleDownloadPDF = async () => {
+  const handleDownloadPdf = async () => {
     setDownloadingType('pdf');
     try {
-      const shortage = await fetchReportData('shortage'), excess = await fetchReportData('excess');
-      const doc = new jsPDF();
-      doc.setFillColor(15, 23, 42); doc.rect(0, 0, 210, 32, 'F');
-      doc.setFontSize(18); doc.setTextColor(255, 255, 255); doc.text('StockSync Reconciliation Report', 14, 18);
-      
-      const fileObj = uploads.find(u => u.id === selectedUploadId);
-      doc.setFontSize(9); doc.setTextColor(148, 163, 184); doc.text(`Snapshot: ${fileObj?.file_name || 'N/A'} | Filter: ${selectedBrand}`, 14, 26);
-      
-      (doc as any).autoTable({ head: [['Metric', 'Value', 'Metric', 'Value']], body: [['Total SKUs', `${overallStats.countedSkus}/${overallStats.totalSkus}`, 'Completion', overallStats.totalSkus > 0 ? `${((overallStats.countedSkus / overallStats.totalSkus) * 100).toFixed(1)}%` : '0%'], ['System Value', `₹${overallStats.systemValue.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`, 'Physical Value', `₹${overallStats.physicalValue.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`]], startY: 40, theme: 'grid', styles: { fontSize: 8 }, headStyles: { fillColor: [51, 65, 85] } });
-      const brandY = (doc as any).lastAutoTable.finalY + 10;
-      doc.setFontSize(12); doc.setTextColor(30, 41, 59); doc.text('Brand-Wise Summary', 14, brandY);
-      (doc as any).autoTable({ head: [['Brand', 'SKUs', 'Counted', 'Sys Val', 'Net Diff', 'Shortages', 'Excess']], body: brandSummaries.filter(b => selectedBrand === 'All Brands' || b.brand === selectedBrand).map(b => [b.brand, b.totalSkus, `${b.countedSkus} (${b.totalSkus > 0 ? ((b.countedSkus / b.totalSkus) * 100).toFixed(0) : 0}%)`, `₹${Math.round(b.systemValue).toLocaleString('en-IN')}`, `₹${Math.round(b.netVarianceValue).toLocaleString('en-IN')}`, b.shortageCount, b.excessCount]), startY: brandY + 4, theme: 'striped', styles: { fontSize: 7 }, headStyles: { fillColor: [30, 41, 59] } });
-      doc.save(`StockSync_Summary_${selectedBrand.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`);
-    } catch (e) { alert('Failed to generate PDF.'); }
-    finally { setDownloadingType(null); }
+      const data = await fetchReportData('full');
+      if (!data || data.length === 0) {
+        alert('No stock data available to print.');
+        return;
+      }
+      exportReportToPdf(data, 'Comprehensive Stock Audit Report', overallStats);
+    } catch (e) {
+      console.error(e);
+      alert('Failed to generate PDF report.');
+    } finally {
+      setDownloadingType(null);
+    }
   };
 
-  if (uploads.length === 0) return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '55vh', textAlign: 'center', gap: 20 }}>
-      <div style={{ width: 64, height: 64, borderRadius: 16, background: '#eef2ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <FileSpreadsheet size={30} color="#4f46e5" />
-      </div>
-      <div>
-        <h2 style={{ fontSize: 20, fontWeight: 700, color: '#0f172a', margin: '0 0 6px' }}>No Stock Snapshot Found</h2>
-        <p style={{ fontSize: 13, color: '#64748b', margin: 0, maxWidth: 320 }}>Upload a stock Excel file first to generate reconciliation reports</p>
-      </div>
-      <button onClick={() => navigate('/upload')} style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '10px 20px', borderRadius: 9, border: 'none', background: '#4f46e5', color: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
-        <UploadCloud size={16} /> Upload Stock File
-      </button>
-    </div>
-  );
+  if (loading && !selectedUploadId) {
+    return <LoadingSpinner label="Loading reports workspace..." />;
+  }
 
-  const reportCards = [
-    { id: 'full' as ReportType,                title: 'Full Reconciliation Report',   desc: 'All materials, counts, variances, and notes',            icon: FileSpreadsheet, badge: 'All SKUs',             badgeColor: '#4f46e5',  borderColor: '#4f46e5' },
-    { id: 'shortage' as ReportType,            title: 'Shortage Report',               desc: 'Items where physical < system stock',                    icon: ArrowDownRight,  badge: `${overallStats.shortageItems} Shortages`, badgeColor: '#dc2626', borderColor: '#dc2626' },
-    { id: 'excess' as ReportType,              title: 'Excess Report',                 desc: 'Items where physical > system stock',                    icon: ArrowUpRight,    badge: `${overallStats.excessItems} Excesses`,  badgeColor: '#d97706', borderColor: '#d97706' },
-    { id: 'increased_variance' as ReportType,  title: 'Increased Variance',            desc: 'Variances wider than previous audit',                    icon: TrendingUp,      badge: 'Deteriorating',       badgeColor: '#7c3aed', borderColor: '#7c3aed' },
-    { id: 'new_issues' as ReportType,          title: 'New Issues',                    desc: 'Materials newly developed in this cycle',               icon: AlertCircle,     badge: 'New',                 badgeColor: '#dc2626', borderColor: '#ef4444' },
-    { id: 'historical_comparison' as ReportType, title: 'Historical Comparison',       desc: 'Previous vs current variance side-by-side',            icon: History,         badge: 'Trend Analysis',      badgeColor: '#059669', borderColor: '#10b981' },
-  ];
-
-  const pct = overallStats.totalSkus > 0 ? ((overallStats.countedSkus / overallStats.totalSkus) * 100).toFixed(0) : '0';
+  const selectedUploadObj = uploads.find(u => u.id === selectedUploadId);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 22, fontFamily: "'Inter', sans-serif" }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      {/* Header */}
+      <PageHeader
+        title="Audit Reports & Analytics"
+        description="Generate discrepancy reports, brand summaries, and historical stock trends"
+        icon={FileText}
+        actions={
+          <button
+            onClick={handleDownloadPdf}
+            disabled={downloadingType === 'pdf'}
+            style={{
+              padding: '9px 18px',
+              borderRadius: 8,
+              border: 'none',
+              background: '#4f46e5',
+              color: '#fff',
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: downloadingType === 'pdf' ? 'not-allowed' : 'pointer',
+              fontFamily: 'inherit',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+            }}
+          >
+            <Download size={15} /> Print Full PDF Report
+          </button>
+        }
+      />
 
-      {/* Dynamic Filter / Navigation Header */}
-      <div style={{ ...W, padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
-          <div>
-            <h1 style={{ fontSize: 20, fontWeight: 800, color: '#0f172a', margin: '0 0 3px', letterSpacing: '-0.3px' }}>Reports & Reconciliation</h1>
-            <p style={{ fontSize: 13, color: '#64748b', margin: 0 }}>Configure filters and generate audit reports</p>
+      {/* Control Panel: Upload selector & Brand/Session Filters */}
+      <div style={{ ...W, padding: '16px 20px', display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 14 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+          {/* Select Upload */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <Calendar size={15} color="#64748b" />
+            <select
+              value={selectedUploadId}
+              onChange={e => setSelectedUploadId(e.target.value)}
+              style={{ height: 38, padding: '0 10px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 13, color: '#0f172a', fontWeight: 600, background: '#fff', outline: 'none' }}
+            >
+              {uploads.map((u: any) => (
+                <option key={u.id} value={u.id}>
+                  {u.file_name} ({new Date(u.uploaded_at).toLocaleDateString()})
+                </option>
+              ))}
+            </select>
           </div>
-          
-          {/* Parallel Date Comparison Toggle */}
-          <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#4f46e5', userSelect: 'none' }}>
-            <input type="checkbox" checked={compareMode} onChange={e => setCompareMode(e.target.checked)} style={{ width: 16, height: 16, accentColor: '#4f46e5', cursor: 'pointer' }} />
-            Compare Dates Parallelly
-          </label>
-        </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
-          
-          {/* Selector 1: Audit Date A */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <label style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Audit Date A (Primary)</label>
-            <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-              <Calendar size={14} color="#64748b" style={{ position: 'absolute', left: 12 }} />
-              <select value={selectedUploadId} onChange={e => setSelectedUploadId(e.target.value)}
-                style={{ width: '100%', height: 38, padding: '0 10px 0 34px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 13, color: '#374151', background: '#fff', outline: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>
-                {uploads.map(up => (
-                  <option key={up.id} value={up.id}>{up.file_name.replace(/\.xlsx$/, '')} ({new Date(up.uploaded_at).toLocaleDateString('en-IN')})</option>
-                ))}
-              </select>
-            </div>
+          {/* Select Brand Filter */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <Building2 size={15} color="#64748b" />
+            <select
+              value={selectedBrand}
+              onChange={e => setSelectedBrand(e.target.value)}
+              style={{ height: 38, padding: '0 10px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 13, color: '#0f172a', background: '#fff', outline: 'none' }}
+            >
+              <option value="All Brands">All Brands</option>
+              {uniqueBrands.map((b: string) => <option key={b} value={b}>{b}</option>)}
+            </select>
           </div>
 
-          {/* Selector 2: Audit Date B (Compare Mode Only) */}
-          {compareMode ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <label style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Audit Date B (Comparison)</label>
-              <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                <Calendar size={14} color="#64748b" style={{ position: 'absolute', left: 12 }} />
-                <select value={compareUploadId} onChange={e => setCompareUploadId(e.target.value)}
-                  style={{ width: '100%', height: 38, padding: '0 10px 0 34px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 13, color: '#374151', background: '#fff', outline: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>
-                  <option value="">Select Date B...</option>
-                  {uploads.filter(up => up.id !== selectedUploadId).map(up => (
-                    <option key={up.id} value={up.id}>{up.file_name.replace(/\.xlsx$/, '')} ({new Date(up.uploaded_at).toLocaleDateString('en-IN')})</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-          ) : (
-            /* Selector 2: Auditing Session (Standard Mode Only) */
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <label style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Auditing Session Filter</label>
-              <select value={selectedSessionId} onChange={e => setSelectedSessionId(e.target.value)}
-                style={{ height: 38, padding: '0 10px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 13, color: '#374151', background: '#fff', outline: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>
-                <option value="All">All Sessions (Full Upload)</option>
-                {sessions.map(s => (
-                  <option key={s.id} value={s.id}>{s.session_name} ({s.status})</option>
-                ))}
+          {/* Select Session Filter */}
+          {sessions.length > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Layers size={15} color="#64748b" />
+              <select
+                value={selectedSessionId}
+                onChange={e => setSelectedSessionId(e.target.value)}
+                style={{ height: 38, padding: '0 10px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 13, color: '#0f172a', background: '#fff', outline: 'none' }}
+              >
+                <option value="All">All Sessions</option>
+                {sessions.map((s: any) => <option key={s.id} value={s.id}>{s.session_name || s.brand}</option>)}
               </select>
             </div>
           )}
-
-          {/* Selector 3: Brand Filter */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <label style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Brand Filter</label>
-            <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-              <Building2 size={14} color="#64748b" style={{ position: 'absolute', left: 12 }} />
-              <select value={selectedBrand} onChange={e => setSelectedBrand(e.target.value)}
-                style={{ width: '100%', height: 38, padding: '0 10px 0 34px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 13, color: '#374151', background: '#fff', outline: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>
-                <option value="All Brands">All Brands ({uniqueBrands.length})</option>
-                {uniqueBrands.map(b => (
-                  <option key={b} value={b}>{b}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-
         </div>
+
+        {/* Compare Toggle */}
+        <button
+          onClick={() => setCompareMode(!compareMode)}
+          style={{
+            padding: '7px 14px',
+            borderRadius: 8,
+            border: `1px solid ${compareMode ? '#c7d2fe' : '#e2e8f0'}`,
+            background: compareMode ? '#eef2ff' : '#fff',
+            color: compareMode ? '#4338ca' : '#475569',
+            fontSize: 12,
+            fontWeight: 600,
+            cursor: 'pointer',
+            fontFamily: 'inherit',
+          }}
+        >
+          {compareMode ? 'Disable Comparison' : 'Compare Snapshot'}
+        </button>
       </div>
 
-      {loading ? (
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 280 }}><Loader2 size={32} color="#4f46e5" style={{ animation: 'spin 1s linear infinite' }} /></div>
-      ) : (
-        <>
-          {/* Mode 1: Standard Single-Audit Mode */}
-          {!compareMode && (
-            <>
-              {/* KPI cards */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 14 }}>
-                {[
-                  { label: 'Audit Completion', value: `${pct}%`, sub: `${overallStats.countedSkus} of ${overallStats.totalSkus} SKUs`, borderColor: '#4f46e5', icon: Layers },
-                  { label: 'System Value', value: `₹${Math.round(overallStats.systemValue).toLocaleString('en-IN')}`, sub: `Physical: ₹${Math.round(overallStats.physicalValue).toLocaleString('en-IN')}`, borderColor: '#10b981', icon: FileSpreadsheet },
-                  { label: 'Shortage Impact', value: `-₹${Math.round(overallStats.shortageValue).toLocaleString('en-IN')}`, sub: `${overallStats.shortageItems} SKUs short`, borderColor: '#dc2626', icon: ArrowDownRight },
-                  { label: 'Excess Impact', value: `+₹${Math.round(overallStats.excessValue).toLocaleString('en-IN')}`, sub: `${overallStats.excessItems} SKUs surplus`, borderColor: '#d97706', icon: ArrowUpRight },
-                ].map(({ label, value, sub, borderColor, icon: Icon }) => (
-                  <div key={label} style={{ ...W, padding: '18px 20px', borderLeft: `4px solid ${borderColor}`, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 }}>
-                    <div>
-                      <p style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', margin: '0 0 8px' }}>{label}</p>
-                      <p style={{ fontSize: 22, fontWeight: 800, color: '#0f172a', margin: '0 0 3px', lineHeight: 1.2 }}>{value}</p>
-                      <p style={{ fontSize: 11, color: '#94a3b8', margin: 0 }}>{sub}</p>
-                    </div>
-                    <div style={{ width: 36, height: 36, borderRadius: 9, background: `${borderColor}15`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                      <Icon size={18} color={borderColor} />
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Excel Report Cards */}
-              <div>
-                <h2 style={{ fontSize: 15, fontWeight: 700, color: '#0f172a', margin: '0 0 4px' }}>Detailed Excel Reports</h2>
-                <p style={{ fontSize: 12, color: '#94a3b8', margin: '0 0 16px' }}>Download tailored spreadsheets with variance insights and audit history</p>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 14 }}>
-                  {reportCards.map(r => {
-                    const Icon = r.icon;
-                    const busy = downloadingType === r.id;
-                    return (
-                      <div key={r.id} style={{ ...W, padding: '20px', borderTop: `3px solid ${r.borderColor}`, display: 'flex', flexDirection: 'column', gap: 14 }}>
-                        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
-                          <div style={{ width: 38, height: 38, borderRadius: 9, background: `${r.borderColor}15`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            <Icon size={18} color={r.borderColor} />
-                          </div>
-                          <span style={{ fontSize: 10, fontWeight: 700, padding: '3px 8px', borderRadius: 9999, background: `${r.badgeColor}15`, color: r.badgeColor, border: `1px solid ${r.badgeColor}30` }}>{r.badge}</span>
-                        </div>
-                        <div>
-                          <h3 style={{ fontSize: 14, fontWeight: 700, color: '#0f172a', margin: '0 0 4px' }}>{r.title}</h3>
-                          <p style={{ fontSize: 12, color: '#64748b', margin: 0, lineHeight: 1.5 }}>{r.desc}</p>
-                        </div>
-                        <button onClick={() => handleDownloadExcel(r.id)} disabled={!!downloadingType}
-                          style={{ ...btn(false, !!downloadingType), width: '100%', justifyContent: 'center', borderTop: `1px solid #f1f5f9`, padding: '9px', borderRadius: 8 }}>
-                          {busy ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Download size={13} />}
-                          {busy ? 'Generating...' : 'Download Excel'}
-                        </button>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* PDF Executive Card */}
-              <div style={{ background: '#0f172a', borderRadius: 14, padding: '24px 28px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 20, boxShadow: '0 4px 20px rgba(0,0,0,0.15)' }}>
-                <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
-                  <div style={{ width: 44, height: 44, borderRadius: 11, background: 'rgba(255,255,255,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    <FileText size={22} color="#fff" />
-                  </div>
-                  <div>
-                    <h3 style={{ fontSize: 17, fontWeight: 800, color: '#fff', margin: '0 0 6px' }}>Executive Management PDF Summary</h3>
-                    <p style={{ fontSize: 13, color: '#94a3b8', margin: 0, maxWidth: 500, lineHeight: 1.5 }}>
-                      Ready-to-present PDF with KPI scorecards, brand performance table, and top 15 critical variance items
-                    </p>
-                  </div>
-                </div>
-                <button onClick={handleDownloadPDF} disabled={downloadingType === 'pdf'}
-                  style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 24px', borderRadius: 10, border: 'none', background: '#fff', color: '#0f172a', fontSize: 14, fontWeight: 700, cursor: downloadingType === 'pdf' ? 'not-allowed' : 'pointer', flexShrink: 0, fontFamily: 'inherit' }}>
-                  {downloadingType === 'pdf' ? <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} /> : <Download size={16} />}
-                  Download PDF
-                </button>
-              </div>
-
-              {/* Brand Summary Table */}
-              <div style={{ ...W, overflow: 'hidden' }}>
-                <div style={{ padding: '16px 22px', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <Building2 size={16} color="#4f46e5" />
-                    <div>
-                      <h2 style={{ fontSize: 15, fontWeight: 700, color: '#0f172a', margin: 0 }}>Brand-Wise Summary</h2>
-                      <p style={{ fontSize: 12, color: '#94a3b8', margin: '1px 0 0' }}>Reconciliation performance by brand</p>
-                    </div>
-                  </div>
-                  <button onClick={() => handleDownloadExcel('brand_summary')} disabled={!!downloadingType}
-                    style={{ ...btn(false, !!downloadingType), fontSize: 12, padding: '7px 14px' }}>
-                    <FileSpreadsheet size={13} color="#16a34a" /> Export Excel
-                  </button>
-                </div>
-                <div style={{ overflowX: 'auto' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-                    <thead>
-                      <tr style={{ background: '#f8fafc', borderBottom: '1px solid #f1f5f9' }}>
-                        {['Brand', 'Progress', 'System Value', 'Physical Value', 'Net Variance', 'Shortages', 'Excess'].map((h, i) => (
-                          <th key={h} style={{ padding: '11px 16px', fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.07em', textAlign: i >= 2 ? 'right' : i === 1 ? 'center' : 'left' }}>{h}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {brandSummaries.filter(b => selectedBrand === 'All Brands' || b.brand === selectedBrand).map(b => {
-                        const pctB = b.totalSkus > 0 ? (b.countedSkus / b.totalSkus) * 100 : 0;
-                        const netColor = b.netVarianceValue < 0 ? '#dc2626' : b.netVarianceValue > 0 ? '#d97706' : '#16a34a';
-                        return (
-                          <tr key={b.brand} style={{ borderBottom: '1px solid #f8fafc' }}
-                            onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = '#fafbfc'}
-                            onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = '#fff'}
-                          >
-                            <td style={{ padding: '13px 16px' }}>
-                              <p style={{ fontWeight: 700, color: '#0f172a', margin: 0 }}>{b.brand}</p>
-                              <p style={{ fontSize: 11, color: '#94a3b8', margin: '2px 0 0' }}>{b.totalSkus} SKUs</p>
-                            </td>
-                            <td style={{ padding: '13px 16px', textAlign: 'center' }}>
-                              <p style={{ fontSize: 11, fontWeight: 600, color: '#475569', margin: '0 0 4px' }}>{b.countedSkus}/{b.totalSkus}</p>
-                              <div style={{ width: 64, height: 4, background: '#f1f5f9', borderRadius: 9999, overflow: 'hidden', margin: '0 auto' }}>
-                                <div style={{ height: '100%', width: `${pctB}%`, background: '#4f46e5', borderRadius: 9999 }} />
-                              </div>
-                            </td>
-                            <td style={{ padding: '13px 16px', textAlign: 'right', color: '#475569', fontWeight: 500 }}>₹{Math.round(b.systemValue).toLocaleString('en-IN')}</td>
-                            <td style={{ padding: '13px 16px', textAlign: 'right', color: '#475569', fontWeight: 500 }}>₹{Math.round(b.physicalValue).toLocaleString('en-IN')}</td>
-                            <td style={{ padding: '13px 16px', textAlign: 'right', fontWeight: 700, color: netColor }}>
-                              {b.netVarianceValue > 0 ? '+' : ''}₹{Math.round(b.netVarianceValue).toLocaleString('en-IN')}
-                            </td>
-                            <td style={{ padding: '13px 16px', textAlign: 'right' }}>
-                              {b.shortageCount > 0 ? <span style={{ fontSize: 11, fontWeight: 700, background: '#fef2f2', color: '#dc2626', padding: '2px 8px', borderRadius: 9999, border: '1px solid #fecaca' }}>{b.shortageCount}</span> : <span style={{ color: '#94a3b8', fontSize: 12 }}>—</span>}
-                            </td>
-                            <td style={{ padding: '13px 16px', textAlign: 'right' }}>
-                              {b.excessCount > 0 ? <span style={{ fontSize: 11, fontWeight: 700, background: '#fffbeb', color: '#d97706', padding: '2px 8px', borderRadius: 9999, border: '1px solid #fde68a' }}>{b.excessCount}</span> : <span style={{ color: '#94a3b8', fontSize: 12 }}>—</span>}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </>
-          )}
-
-          {/* Mode 2: Parallel Date Comparison Mode */}
-          {compareMode && (
-            <div style={{ ...W, overflow: 'hidden' }}>
-              <div style={{ padding: '16px 22px', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <Layers size={16} color="#4f46e5" />
-                  <div>
-                    <h2 style={{ fontSize: 15, fontWeight: 700, color: '#0f172a', margin: 0 }}>Parallel Audit Comparison</h2>
-                    <p style={{ fontSize: 12, color: '#94a3b8', margin: '1px 0 0' }}>Side-by-side reconciliation comparison</p>
-                  </div>
-                </div>
-                <button onClick={handleDownloadComparisonExcel} disabled={!compareUploadId || !!downloadingType}
-                  style={{ ...btn(true, !compareUploadId || !!downloadingType), fontSize: 12, padding: '7px 14px' }}>
-                  {downloadingType === 'comparison' ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <FileSpreadsheet size={13} />}
-                  Export Comparison Excel
-                </button>
-              </div>
-              
-              {!compareUploadId ? (
-                <div style={{ padding: '64px 32px', textAlign: 'center', color: '#64748b', fontSize: 13 }}>
-                  Select "Audit Date B" in the filters above to load the comparison data.
-                </div>
-              ) : (
-                <div style={{ overflowX: 'auto', maxHeight: 600, overflowY: 'auto' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
-                    <thead>
-                      <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', position: 'sticky', top: 0, zIndex: 10 }}>
-                        <th style={{ padding: '12px 16px', textAlign: 'left', color: '#475569', fontSize: 10, textTransform: 'uppercase', fontWeight: 800 }}>SKU / Material</th>
-                        <th style={{ padding: '12px 16px', textAlign: 'left', color: '#475569', fontSize: 10, textTransform: 'uppercase', fontWeight: 800 }}>Brand</th>
-                        <th style={{ padding: '12px 16px', textAlign: 'right', color: '#475569', fontSize: 10, textTransform: 'uppercase', fontWeight: 800 }}>MRP</th>
-                        <th style={{ padding: '12px 16px', textAlign: 'center', color: '#4f46e5', fontSize: 10, textTransform: 'uppercase', fontWeight: 800, background: '#f0f4ff', borderLeft: '1px solid #e2e8f0' }} colSpan={3}>Audit Date A</th>
-                        <th style={{ padding: '12px 16px', textAlign: 'center', color: '#059669', fontSize: 10, textTransform: 'uppercase', fontWeight: 800, background: '#ecfdf5', borderLeft: '1px solid #e2e8f0' }} colSpan={3}>Audit Date B</th>
-                        <th style={{ padding: '12px 16px', textAlign: 'right', color: '#b45309', fontSize: 10, textTransform: 'uppercase', fontWeight: 800, borderLeft: '1px solid #e2e8f0' }} colSpan={2}>Delta Change</th>
-                      </tr>
-                      <tr style={{ background: '#f1f5f9', borderBottom: '1px solid #cbd5e1', position: 'sticky', top: 35, zIndex: 10 }}>
-                        <th></th><th></th><th></th>
-                        {/* Audit A */}
-                        <th style={{ padding: '6px 8px', fontSize: 9, color: '#4f46e5', textAlign: 'right', background: '#f5f7ff', borderLeft: '1px solid #e2e8f0' }}>System</th>
-                        <th style={{ padding: '6px 8px', fontSize: 9, color: '#4f46e5', textAlign: 'right', background: '#f5f7ff' }}>Counted</th>
-                        <th style={{ padding: '6px 8px', fontSize: 9, color: '#4f46e5', textAlign: 'right', background: '#f5f7ff', fontWeight: 700 }}>Variance</th>
-                        {/* Audit B */}
-                        <th style={{ padding: '6px 8px', fontSize: 9, color: '#059669', textAlign: 'right', background: '#f2fdf9', borderLeft: '1px solid #e2e8f0' }}>System</th>
-                        <th style={{ padding: '6px 8px', fontSize: 9, color: '#059669', textAlign: 'right', background: '#f2fdf9' }}>Counted</th>
-                        <th style={{ padding: '6px 8px', fontSize: 9, color: '#059669', textAlign: 'right', background: '#f2fdf9', fontWeight: 700 }}>Variance</th>
-                        {/* Delta */}
-                        <th style={{ padding: '6px 8px', fontSize: 9, color: '#b45309', textAlign: 'right', borderLeft: '1px solid #e2e8f0' }}>Count Diff</th>
-                        <th style={{ padding: '6px 8px', fontSize: 9, color: '#b45309', textAlign: 'right' }}>Value Diff</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {comparisonRows.map((r, idx) => (
-                        <tr key={`${r.material}_${r.mrp}`} style={{ borderBottom: '1px solid #f1f5f9', background: idx % 2 === 0 ? '#fff' : '#f8fafc' }}>
-                          <td style={{ padding: '12px 16px', textAlign: 'left' }}>
-                            <div style={{ fontWeight: 700, color: '#0f172a' }}>{r.material}</div>
-                            <div style={{ fontSize: 11, color: '#64748b', maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.description}</div>
-                          </td>
-                          <td style={{ padding: '12px 16px', textAlign: 'left', color: '#475569', fontWeight: 500 }}>{r.brand}</td>
-                          <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 600 }}>₹{r.mrp.toFixed(2)}</td>
-                          
-                          {/* Audit A */}
-                          <td style={{ padding: '10px 8px', textAlign: 'right', background: '#f5f7ff', borderLeft: '1px solid #e2e8f0' }}>{r.sysA}</td>
-                          <td style={{ padding: '10px 8px', textAlign: 'right', background: '#f5f7ff' }}>{r.phyA}</td>
-                          <td style={{ padding: '10px 8px', textAlign: 'right', background: '#f5f7ff', color: r.varA < 0 ? '#dc2626' : r.varA > 0 ? '#d97706' : '#16a34a', fontWeight: 700 }}>
-                            {r.varA > 0 ? '+' : ''}{r.varA}
-                          </td>
-
-                          {/* Audit B */}
-                          <td style={{ padding: '10px 8px', textAlign: 'right', background: '#f2fdf9', borderLeft: '1px solid #e2e8f0' }}>{r.sysB}</td>
-                          <td style={{ padding: '10px 8px', textAlign: 'right', background: '#f2fdf9' }}>{r.phyB}</td>
-                          <td style={{ padding: '10px 8px', textAlign: 'right', background: '#f2fdf9', color: r.varB < 0 ? '#dc2626' : r.varB > 0 ? '#d97706' : '#16a34a', fontWeight: 700 }}>
-                            {r.varB > 0 ? '+' : ''}{r.varB}
-                          </td>
-
-                          {/* Delta */}
-                          <td style={{ padding: '10px 8px', textAlign: 'right', borderLeft: '1px solid #e2e8f0', color: r.deltaCount < 0 ? '#dc2626' : r.deltaCount > 0 ? '#16a34a' : '#64748b', fontWeight: 700 }}>
-                            {r.deltaCount > 0 ? '+' : ''}{r.deltaCount} PCS
-                          </td>
-                          <td style={{ padding: '10px 8px', textAlign: 'right', color: r.deltaValue < 0 ? '#dc2626' : r.deltaValue > 0 ? '#16a34a' : '#64748b', fontWeight: 700 }}>
-                            {r.deltaValue > 0 ? '+' : ''}₹{Math.round(r.deltaValue).toLocaleString('en-IN')}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          )}
-        </>
+      {/* Snapshot Comparison Selector if Compare Mode */}
+      {compareMode && (
+        <div style={{ ...W, padding: '16px 20px', background: '#eef2ff', border: '1px solid #c7d2fe', display: 'flex', alignItems: 'center', gap: 14 }}>
+          <History size={18} color="#4f46e5" />
+          <span style={{ fontSize: 13, fontWeight: 600, color: '#3730a3' }}>Compare primary upload with:</span>
+          <select
+            value={compareUploadId}
+            onChange={e => setCompareUploadId(e.target.value)}
+            style={{ height: 36, padding: '0 10px', border: '1px solid #c7d2fe', borderRadius: 8, fontSize: 13, color: '#0f172a', background: '#fff', outline: 'none' }}
+          >
+            <option value="">Select Secondary Snapshot...</option>
+            {uploads.filter((u: any) => u.id !== selectedUploadId).map((u: any) => (
+              <option key={u.id} value={u.id}>{u.file_name} ({new Date(u.uploaded_at).toLocaleDateString()})</option>
+            ))}
+          </select>
+        </div>
       )}
 
-      <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
+      {/* Summary KPI Cards */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 14 }}>
+        {[
+          { label: 'Total SKUs', value: overallStats.totalSkus, sub: `${overallStats.countedSkus} Counted`, color: '#4f46e5' },
+          { label: 'System Value', value: `₹${overallStats.systemValue.toLocaleString('en-IN')}`, sub: 'Master Book Value', color: '#64748b' },
+          { label: 'Physical Value', value: `₹${overallStats.physicalValue.toLocaleString('en-IN')}`, sub: 'Audited Value', color: '#10b981' },
+          { label: 'Shortage Value', value: `₹${overallStats.shortageValue.toLocaleString('en-IN')}`, sub: `${overallStats.shortageItems} Items Short`, color: '#ef4444' },
+          { label: 'Excess Value', value: `₹${overallStats.excessValue.toLocaleString('en-IN')}`, sub: `${overallStats.excessItems} Items Excess`, color: '#f59e0b' },
+        ].map(k => (
+          <div key={k.label} style={{ ...W, padding: '16px 18px', borderLeft: `4px solid ${k.color}` }}>
+            <p style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 6px' }}>{k.label}</p>
+            <p style={{ fontSize: 20, fontWeight: 800, color: '#0f172a', margin: '0 0 2px' }}>{k.value}</p>
+            <p style={{ fontSize: 11, color: '#64748b', margin: 0 }}>{k.sub}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Export Action Cards */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}>
+        {[
+          { type: 'full', title: 'Full Stock Audit Report', desc: 'Complete itemized snapshot including physical counts and calculated variances for all SKUs.', color: '#4f46e5' },
+          { type: 'shortage', title: 'Shortage Discrepancies', desc: 'Filtered list of all materials with physical counts lower than system stock.', color: '#dc2626' },
+          { type: 'excess', title: 'Excess Surplus Stock', desc: 'List of all materials where physical counts exceed recorded system quantity.', color: '#d97706' },
+          { type: 'brand_summary', title: 'Brand Category Summary', desc: 'High-level aggregation of stock count progress, total valuation, and net variance by Brand.', color: '#10b981' },
+          { type: 'new_issues', title: 'New Discrepancies', desc: 'Materials that were equal in the previous count but developed a variance in this audit.', color: '#7c3aed' },
+          { type: 'increased_variance', title: 'Escalated Variances', desc: 'Items where discrepancy gap has widened compared to historical records.', color: '#ef4444' },
+        ].map(r => (
+          <div key={r.type} style={{ ...W, padding: '20px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: 14 }}>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                <span style={{ fontSize: 15, fontWeight: 700, color: '#0f172a' }}>{r.title}</span>
+                <FileSpreadsheet size={18} color={r.color} />
+              </div>
+              <p style={{ fontSize: 12, color: '#64748b', margin: 0, lineHeight: 1.5 }}>{r.desc}</p>
+            </div>
+            <button
+              onClick={() => handleDownloadExcel(r.type as ReportType)}
+              disabled={downloadingType === r.type}
+              style={{
+                width: '100%',
+                padding: '9px 0',
+                borderRadius: 8,
+                border: '1px solid #e2e8f0',
+                background: '#f8fafc',
+                color: '#334155',
+                fontSize: 13,
+                fontWeight: 600,
+                cursor: downloadingType === r.type ? 'not-allowed' : 'pointer',
+                fontFamily: 'inherit',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 6,
+              }}
+            >
+              <Download size={14} color={r.color} /> Export Excel (.xlsx)
+            </button>
+          </div>
+        ))}
+      </div>
+
+      {/* Brand Summary Table Preview */}
+      <div style={{ ...W, overflow: 'hidden' }}>
+        <div style={{ padding: '16px 20px', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div>
+            <h3 style={{ fontSize: 16, fontWeight: 700, color: '#0f172a', margin: '0 0 2px' }}>Brand Financial Breakdown</h3>
+            <p style={{ fontSize: 12, color: '#64748b', margin: 0 }}>System valuation vs physical count valuation by brand category</p>
+          </div>
+          <StatusBadge status="Completed" customLabel={`${brandSummaries.length} Brands`} />
+        </div>
+
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+            <thead>
+              <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+                {['Brand', 'SKUs (Counted/Total)', 'System Value', 'Physical Value', 'Net Variance Value', 'Issues'].map((h, i) => (
+                  <th key={h} style={{ padding: '10px 16px', fontSize: 11, fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em', textAlign: i >= 2 ? 'right' : 'left' }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {brandSummaries.map((b: BrandSummaryItem) => (
+                <tr key={b.brand} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                  <td style={{ padding: '12px 16px', fontWeight: 700, color: '#0f172a' }}>{b.brand}</td>
+                  <td style={{ padding: '12px 16px', color: '#64748b' }}>{b.countedSkus} / {b.totalSkus} ({b.totalSkus > 0 ? Math.round((b.countedSkus / b.totalSkus) * 100) : 0}%)</td>
+                  <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 600, color: '#334155' }}>₹{b.systemValue.toLocaleString('en-IN')}</td>
+                  <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 600, color: '#10b981' }}>₹{b.physicalValue.toLocaleString('en-IN')}</td>
+                  <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, color: b.netVarianceValue < 0 ? '#dc2626' : b.netVarianceValue > 0 ? '#d97706' : '#16a34a' }}>
+                    {b.netVarianceValue > 0 ? '+' : ''}₹{b.netVarianceValue.toLocaleString('en-IN')}
+                  </td>
+                  <td style={{ padding: '12px 16px', textAlign: 'right' }}>
+                    <span style={{ fontSize: 11, fontWeight: 600, color: b.shortageCount > 0 ? '#dc2626' : '#64748b' }}>
+                      {b.shortageCount} short / {b.excessCount} excess
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   );
 }

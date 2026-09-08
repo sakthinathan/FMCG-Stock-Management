@@ -1,109 +1,168 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Package, AlertCircle, CheckCircle2, AlertTriangle, Loader2, ArrowRight, Building2, UploadCloud } from 'lucide-react';
+import { Package, AlertCircle, CheckCircle2, AlertTriangle, ArrowRight, Building2, UploadCloud, LayoutDashboard } from 'lucide-react';
 import { useStockStore } from '@/store/useStockStore';
 import { supabase } from '@/lib/supabase';
+import { LoadingSpinner } from '@/components/common/LoadingSpinner';
+import { EmptyState } from '@/components/common/EmptyState';
+import { KpiStatCard } from '@/components/common/KpiStatCard';
+import { StatusBadge } from '@/components/common/StatusBadge';
+import { PageHeader } from '@/components/common/PageHeader';
 
 const W: React.CSSProperties = { background: '#fff', borderRadius: 12, boxShadow: '0 1px 3px rgba(0,0,0,0.06)' };
-
-// KPI card with left colored border like payroll system
-function KpiCard({ label, value, sub, borderColor, icon: Icon, iconColor }: any) {
-  return (
-    <div style={{ ...W, padding: '20px 20px 18px', borderLeft: `4px solid ${borderColor}`, display: 'flex', alignItems: 'flex-start', gap: 14 }}>
-      <div style={{ flex: 1 }}>
-        <p style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em', margin: '0 0 8px' }}>{label}</p>
-        <p style={{ fontSize: 32, fontWeight: 800, color: '#0f172a', margin: '0 0 4px', lineHeight: 1.1 }}>{value}</p>
-        <p style={{ fontSize: 12, color: '#94a3b8', margin: 0 }}>{sub}</p>
-      </div>
-      <div style={{ width: 44, height: 44, borderRadius: 12, background: `${borderColor}15`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-        <Icon size={22} color={borderColor} />
-      </div>
-    </div>
-  );
-}
 
 export function Dashboard() {
   const navigate = useNavigate();
   const { activeUploadId, filename, uploadedAt } = useStockStore();
   const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState({ totalBrands: 0, totalProducts: 0, countedProducts: 0, pendingProducts: 0, equalCount: 0, shortage: 0, excess: 0 });
+  const [stats, setStats] = useState({
+    totalBrands: 0,
+    totalProducts: 0,
+    countedProducts: 0,
+    pendingProducts: 0,
+    equalCount: 0,
+    shortage: 0,
+    excess: 0
+  });
   const [issues, setIssues] = useState<any[]>([]);
 
   useEffect(() => {
-    async function fetch() {
-      if (!activeUploadId) { setLoading(false); return; }
+    async function fetchDashboardData() {
+      if (!activeUploadId) {
+        setLoading(false);
+        return;
+      }
       try {
-        const { data: snaps } = await supabase.from('system_stock_snapshots').select('*').eq('upload_id', activeUploadId);
-        const { data: counts } = await supabase.from('physical_stock_counts').select('*, system_stock_snapshots!inner(upload_id)').eq('system_stock_snapshots.upload_id', activeUploadId);
+        const { data: snaps } = await supabase
+          .from('system_stock_snapshots')
+          .select('id, brand, material, material_desc, mrp')
+          .eq('upload_id', activeUploadId);
+
+        const { data: counts } = await supabase
+          .from('physical_stock_counts')
+          .select('id, snapshot_id, status, variance, system_stock_snapshots!inner(upload_id)')
+          .eq('system_stock_snapshots.upload_id', activeUploadId);
+
         const brands = new Set(snaps?.map(s => s.brand)).size;
         const total = snaps?.length || 0;
         const counted = counts?.length || 0;
         let eq = 0, sh = 0, ex = 0;
         const issueList: any[] = [];
+
         counts?.forEach(c => {
-          if (c.status === 'Equal') eq++; else if (c.status === 'Shortage') sh++; else if (c.status === 'Excess') ex++;
+          if (c.status === 'Equal') eq++;
+          else if (c.status === 'Shortage') sh++;
+          else if (c.status === 'Excess') ex++;
+
           if (c.variance !== 0) {
             const snap = snaps?.find(s => s.id === c.snapshot_id);
-            if (snap) issueList.push({ id: c.id, material: snap.material, desc: snap.material_desc, brand: snap.brand, type: c.status, variance: c.variance, impact: Math.round(Math.abs(c.variance) * (snap.mrp || 0)) });
+            if (snap) {
+              issueList.push({
+                id: c.id,
+                material: snap.material,
+                desc: snap.material_desc,
+                brand: snap.brand,
+                type: c.status,
+                variance: c.variance,
+                impact: Math.round(Math.abs(c.variance) * (snap.mrp || 0))
+              });
+            }
           }
         });
+
         issueList.sort((a, b) => Math.abs(b.variance) - Math.abs(a.variance));
-        setStats({ totalBrands: brands, totalProducts: total, countedProducts: counted, pendingProducts: total - counted, equalCount: eq, shortage: sh, excess: ex });
+        setStats({
+          totalBrands: brands,
+          totalProducts: total,
+          countedProducts: counted,
+          pendingProducts: total - counted,
+          equalCount: eq,
+          shortage: sh,
+          excess: ex
+        });
         setIssues(issueList.slice(0, 8));
-      } catch (e) { console.error(e); }
-      finally { setLoading(false); }
+      } catch (e) {
+        console.error('Error fetching dashboard data:', e);
+      } finally {
+        setLoading(false);
+      }
     }
-    fetch();
-    const ch = supabase.channel('dash').on('postgres_changes', { event: '*', schema: 'public', table: 'physical_stock_counts' }, fetch).subscribe();
-    return () => { supabase.removeChannel(ch); };
+
+    fetchDashboardData();
+    const channel = supabase
+      .channel('dash')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'physical_stock_counts' }, fetchDashboardData)
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [activeUploadId]);
 
-  if (loading) return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 240 }}><Loader2 size={32} color="#4f46e5" style={{ animation: 'spin 1s linear infinite' }} /></div>;
+  if (loading) {
+    return <LoadingSpinner label="Loading dashboard metrics..." />;
+  }
 
-  if (!activeUploadId) return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '60vh', textAlign: 'center', gap: 20 }}>
-      <div style={{ width: 72, height: 72, borderRadius: 20, background: '#eef2ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <UploadCloud size={32} color="#4f46e5" />
-      </div>
-      <div>
-        <h2 style={{ fontSize: 22, fontWeight: 700, color: '#0f172a', margin: '0 0 8px' }}>No Active Session</h2>
-        <p style={{ fontSize: 14, color: '#64748b', margin: 0, maxWidth: 300 }}>Upload a stock Excel file to start the reconciliation process</p>
-      </div>
-      <button onClick={() => navigate('/upload')} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '11px 22px', borderRadius: 10, border: 'none', background: '#4f46e5', color: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
-        <UploadCloud size={16} /> Upload Stock File
-      </button>
-    </div>
-  );
+  if (!activeUploadId) {
+    return (
+      <EmptyState
+        icon={UploadCloud}
+        title="No Active Session"
+        description="Upload a stock Excel file to start the reconciliation process"
+        actionText="Upload Stock File"
+        onAction={() => navigate('/upload')}
+      />
+    );
+  }
 
   const pct = stats.totalProducts > 0 ? Math.round((stats.countedProducts / stats.totalProducts) * 100) : 0;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 20, fontFamily: "'Inter', sans-serif" }}>
-
-      {/* Page header row */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
-        <div>
-          <h1 style={{ fontSize: 22, fontWeight: 800, color: '#0f172a', margin: '0 0 3px', letterSpacing: '-0.3px' }}>Stock Overview</h1>
-          <p style={{ fontSize: 13, color: '#64748b', margin: 0 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      {/* Page Header */}
+      <PageHeader
+        title="Stock Overview"
+        icon={LayoutDashboard}
+        description={
+          <>
             <strong style={{ color: '#334155' }}>{filename}</strong>
             {uploadedAt && <> &nbsp;·&nbsp; {new Date(uploadedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</>}
-          </p>
-        </div>
-        <button onClick={() => navigate('/brands')} style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '10px 20px', borderRadius: 10, border: 'none', background: '#4f46e5', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', boxShadow: '0 2px 8px rgba(79,70,229,0.3)' }}>
-          Continue Count <ArrowRight size={14} />
-        </button>
-      </div>
+          </>
+        }
+        actions={
+          <button
+            onClick={() => navigate('/brands')}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 7,
+              padding: '10px 20px',
+              borderRadius: 10,
+              border: 'none',
+              background: '#4f46e5',
+              color: '#fff',
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+              boxShadow: '0 2px 8px rgba(79,70,229,0.3)',
+            }}
+          >
+            Continue Count <ArrowRight size={14} />
+          </button>
+        }
+      />
 
-      {/* KPI cards — left border style like payroll */}
+      {/* KPI Cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16 }}>
-        <KpiCard label="Total Brands"   value={stats.totalBrands}    sub="Active categories"  borderColor="#4f46e5" icon={Building2}    iconColor="#4f46e5" />
-        <KpiCard label="Total SKUs"     value={stats.totalProducts}   sub="In master file"     borderColor="#10b981" icon={Package}      iconColor="#10b981" />
-        <KpiCard label="Pending Count"  value={stats.pendingProducts} sub="Awaiting audit"     borderColor="#f59e0b" icon={AlertCircle}  iconColor="#f59e0b" />
-        <KpiCard label="Total Issues"   value={stats.shortage + stats.excess} sub="Variances found" borderColor="#ef4444" icon={AlertTriangle} iconColor="#ef4444" />
+        <KpiStatCard label="Total Brands" value={stats.totalBrands} sub="Active categories" borderColor="#4f46e5" icon={Building2} />
+        <KpiStatCard label="Total SKUs" value={stats.totalProducts} sub="In master file" borderColor="#10b981" icon={Package} />
+        <KpiStatCard label="Pending Count" value={stats.pendingProducts} sub="Awaiting audit" borderColor="#f59e0b" icon={AlertCircle} />
+        <KpiStatCard label="Total Issues" value={stats.shortage + stats.excess} sub="Variances found" borderColor="#ef4444" icon={AlertTriangle} />
       </div>
 
-      {/* Two column: progress + discrepancy summary */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+      {/* Progress & Discrepancy Summary */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16 }}>
         {/* Progress card */}
         <div style={{ ...W, padding: '20px 24px' }}>
           <p style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', margin: '0 0 4px' }}>Audit Progress</p>
@@ -116,14 +175,14 @@ export function Dashboard() {
           </div>
         </div>
 
-        {/* Status summary */}
+        {/* Count Results */}
         <div style={{ ...W, padding: '20px 24px' }}>
           <p style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', margin: '0 0 16px' }}>Count Results</p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {[
-              { label: 'Equal (exact match)', value: stats.equalCount,   color: '#10b981' },
-              { label: 'Shortage (deficit)',  value: stats.shortage,      color: '#ef4444' },
-              { label: 'Excess (surplus)',    value: stats.excess,        color: '#f59e0b' },
+              { label: 'Equal (exact match)', value: stats.equalCount, color: '#10b981' },
+              { label: 'Shortage (deficit)', value: stats.shortage, color: '#ef4444' },
+              { label: 'Excess (surplus)', value: stats.excess, color: '#f59e0b' },
             ].map(r => (
               <div key={r.label} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -137,7 +196,7 @@ export function Dashboard() {
         </div>
       </div>
 
-      {/* Issues table */}
+      {/* Issues Table */}
       <div style={{ ...W, overflow: 'hidden' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 24px 14px', borderBottom: '1px solid #f1f5f9' }}>
           <div>
@@ -177,7 +236,7 @@ export function Dashboard() {
                     </td>
                     <td style={{ padding: '13px 20px', fontSize: 12, color: '#64748b', fontWeight: 500 }}>{issue.brand}</td>
                     <td style={{ padding: '13px 20px', textAlign: 'center' }}>
-                      <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 9999, background: issue.type === 'Shortage' ? '#fef2f2' : '#fffbeb', color: issue.type === 'Shortage' ? '#dc2626' : '#d97706' }}>{issue.type}</span>
+                      <StatusBadge status={issue.type} />
                     </td>
                     <td style={{ padding: '13px 20px', textAlign: 'center', fontWeight: 800, color: issue.variance < 0 ? '#dc2626' : '#d97706', fontSize: 14 }}>
                       {issue.variance > 0 ? '+' : ''}{issue.variance}
@@ -190,7 +249,6 @@ export function Dashboard() {
           </div>
         )}
       </div>
-      <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 }

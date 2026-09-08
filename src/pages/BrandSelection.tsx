@@ -1,17 +1,24 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { PackageOpen, Loader2, Building2, ArrowRight, XCircle } from 'lucide-react';
+import { PackageOpen, Building2, ArrowRight, XCircle, PackageSearch } from 'lucide-react';
 import { useStockStore } from '@/store/useStockStore';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { motion } from 'framer-motion';
+import { LoadingSpinner } from '@/components/common/LoadingSpinner';
+import { EmptyState } from '@/components/common/EmptyState';
+import { PageHeader } from '@/components/common/PageHeader';
+import { StatusBadge } from '@/components/common/StatusBadge';
+import { ConfirmModal } from '@/components/common/ConfirmModal';
 
 interface BrandSummary {
-  name: string; totalProducts: number; countedProducts: number;
-  status: 'Not Started' | 'In Progress' | 'Completed'; progress: number; sessionId: string | null;
+  name: string;
+  totalProducts: number;
+  countedProducts: number;
+  status: 'Not Started' | 'In Progress' | 'Completed';
+  progress: number;
+  sessionId: string | null;
 }
-
-const card: React.CSSProperties = { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, boxShadow: '0 1px 3px rgba(0,0,0,0.06)' };
 
 export function BrandSelection() {
   const navigate = useNavigate();
@@ -19,16 +26,12 @@ export function BrandSelection() {
   const { profile } = useAuth();
   const [brands, setBrands] = useState<BrandSummary[]>([]);
   const [loading, setLoading] = useState(true);
-  
-  // Custom Modal States
+
+  // Modal States
   const [showCloseConfirm, setShowCloseConfirm] = useState(false);
   const [showSessionPrompt, setShowSessionPrompt] = useState(false);
   const [pendingBrandName, setPendingBrandName] = useState('');
   const [sessionNameInput, setSessionNameInput] = useState('');
-
-  const handleCloseStockCheck = () => {
-    setShowCloseConfirm(true);
-  };
 
   const confirmCloseStockCheck = async () => {
     setShowCloseConfirm(false);
@@ -48,15 +51,29 @@ export function BrandSelection() {
   };
 
   useEffect(() => {
-    async function load() {
-      if (!activeUploadId) { setLoading(false); return; }
+    async function loadBrandSummaries() {
+      if (!activeUploadId) {
+        setLoading(false);
+        return;
+      }
       try {
-        const { data: snaps } = await supabase.from('system_stock_snapshots').select('brand').eq('upload_id', activeUploadId);
-        const { data: sessions } = await supabase.from('stock_count_sessions').select('id, brand, status').eq('upload_id', activeUploadId);
-        const { data: counts } = await supabase.from('physical_stock_counts').select('session_id');
+        const { data: snaps } = await supabase
+          .from('system_stock_snapshots')
+          .select('brand')
+          .eq('upload_id', activeUploadId);
+
+        const { data: sessions } = await supabase
+          .from('stock_count_sessions')
+          .select('id, brand, status')
+          .eq('upload_id', activeUploadId);
+
+        const { data: counts } = await supabase
+          .from('physical_stock_counts')
+          .select('session_id');
 
         const brandMap = new Map<string, number>();
         snaps?.forEach(r => brandMap.set(r.brand, (brandMap.get(r.brand) || 0) + 1));
+
         const sessionMap = new Map(sessions?.map(s => [s.brand, s]) || []);
         const countMap = new Map<string, number>();
         counts?.forEach(r => countMap.set(r.session_id, (countMap.get(r.session_id) || 0) + 1));
@@ -69,13 +86,25 @@ export function BrandSelection() {
           let status: BrandSummary['status'] = 'Not Started';
           if (sess?.status === 'Completed' || progress === 100) status = 'Completed';
           else if (sess?.status === 'In Progress' || progress > 0) status = 'In Progress';
-          list.push({ name, totalProducts: total, countedProducts: counted, status, progress, sessionId: sess?.id || null });
+
+          list.push({
+            name,
+            totalProducts: total,
+            countedProducts: counted,
+            status,
+            progress,
+            sessionId: sess?.id || null
+          });
         }
         setBrands(list.sort((a, b) => a.name.localeCompare(b.name)));
-      } catch (e) { console.error(e); }
-      finally { setLoading(false); }
+      } catch (e) {
+        console.error('Error loading brand summaries:', e);
+      } finally {
+        setLoading(false);
+      }
     }
-    load();
+
+    loadBrandSummaries();
   }, [activeUploadId]);
 
   const handleStart = async (name: string, sessionId: string | null) => {
@@ -103,7 +132,7 @@ export function BrandSelection() {
         })
         .select()
         .single();
-      
+
       if (data) {
         navigate(`/count/${data.id}`);
       }
@@ -112,100 +141,150 @@ export function BrandSelection() {
     }
   };
 
-  if (loading) return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 240 }}><Loader2 size={30} color="#4f46e5" style={{ animation: 'spin 1s linear infinite' }} /></div>;
+  if (loading) {
+    return <LoadingSpinner label="Loading brand categories..." />;
+  }
 
-  if (!activeUploadId || brands.length === 0) return (
-    <div style={{ ...card, maxWidth: 480, margin: '80px auto', padding: '48px 32px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
-      <div style={{ width: 52, height: 52, borderRadius: 12, background: '#eef2ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <PackageOpen size={26} color="#4f46e5" />
-      </div>
-      <div>
-        <h2 style={{ fontSize: 18, fontWeight: 700, color: '#0f172a', margin: 0 }}>No Stock File Active</h2>
-        <p style={{ fontSize: 13, color: '#64748b', margin: '6px 0 0' }}>Upload a stock Excel file to begin brand-wise counting</p>
-      </div>
-      <button onClick={() => navigate('/upload')} style={{ padding: '9px 18px', borderRadius: 8, border: 'none', background: '#4f46e5', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Upload Stock File</button>
-    </div>
-  );
+  if (!activeUploadId || brands.length === 0) {
+    return (
+      <EmptyState
+        icon={PackageOpen}
+        title="No Stock File Active"
+        description="Upload a stock Excel file to begin brand-wise counting"
+        actionText="Upload Stock File"
+        onAction={() => navigate('/upload')}
+      />
+    );
+  }
 
-  const done = brands.filter(b => b.status === 'Completed').length;
-
-  const statusCfg = (s: string) => s === 'Completed'
-    ? { border: '#bbf7d0', bg: '#eef2ff', iconBg: '#f0fdf4', iconColor: '#16a34a', badgeBg: '#f0fdf4', badgeColor: '#16a34a', badgeBorder: '#bbf7d0', label: '✓ Done', barColor: '#16a34a' }
-    : s === 'In Progress'
-    ? { border: '#c7d2fe', bg: '#fff', iconBg: '#eef2ff', iconColor: '#4f46e5', badgeBg: '#eef2ff', badgeColor: '#4338ca', badgeBorder: '#c7d2fe', label: '⏸ In Progress', barColor: '#4f46e5' }
-    : { border: '#e2e8f0', bg: '#fff', iconBg: '#f8fafc', iconColor: '#94a3b8', badgeBg: '#f8fafc', badgeColor: '#64748b', badgeBorder: '#e2e8f0', label: 'Not Started', barColor: '#94a3b8' };
+  const doneCount = brands.filter(b => b.status === 'Completed').length;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
       {/* Header */}
-      <div style={{ ...card, padding: '18px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
-        <div>
-          <h1 style={{ fontSize: 20, fontWeight: 700, color: '#0f172a', margin: 0 }}>Brand-Wise Counting</h1>
-          <p style={{ fontSize: 13, color: '#64748b', margin: '4px 0 0' }}>{filename} · {brands.length} brands · {done} completed</p>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <button
-            onClick={handleCloseStockCheck}
-            style={{
-              padding: '7px 14px', borderRadius: 8, border: '1px solid #fca5a5',
-              background: '#fef2f2', color: '#dc2626', fontSize: 12, fontWeight: 600,
-              cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 6
-            }}
-          >
-            <XCircle size={14} /> Close Stock Check
-          </button>
-          <span style={{ fontSize: 11, fontWeight: 600, background: '#eef2ff', color: '#4338ca', padding: '4px 10px', borderRadius: 9999, border: '1px solid #c7d2fe' }}>{brands.length} Brands</span>
-          <span style={{ fontSize: 11, fontWeight: 600, background: '#f0fdf4', color: '#16a34a', padding: '4px 10px', borderRadius: 9999, border: '1px solid #bbf7d0' }}>{done} Done</span>
-        </div>
-      </div>
+      <PageHeader
+        title="Brand-Wise Counting"
+        icon={PackageSearch}
+        description={`${filename} · ${brands.length} brands · ${doneCount} completed`}
+        actions={
+          <>
+            <button
+              onClick={() => setShowCloseConfirm(true)}
+              style={{
+                padding: '7px 14px',
+                borderRadius: 8,
+                border: '1px solid #fca5a5',
+                background: '#fef2f2',
+                color: '#dc2626',
+                fontSize: 12,
+                fontWeight: 600,
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6
+              }}
+            >
+              <XCircle size={14} /> Close Stock Check
+            </button>
+            <StatusBadge status="In Progress" customLabel={`${brands.length} Brands`} />
+            <StatusBadge status="Completed" customLabel={`${doneCount} Done`} />
+          </>
+        }
+      />
 
       {/* Grid */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 16 }}>
         {brands.map((brand, i) => {
-          const cfg = statusCfg(brand.status);
+          const isDone = brand.status === 'Completed';
+          const isInProgress = brand.status === 'In Progress';
+
+          const cardBg = isDone ? '#eef2ff' : '#fff';
+          const cardBorder = isDone ? '#bbf7d0' : isInProgress ? '#c7d2fe' : '#e2e8f0';
+          const barColor = isDone ? '#16a34a' : isInProgress ? '#4f46e5' : '#94a3b8';
+
           return (
-            <motion.div key={brand.name} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.18, delay: i * 0.04 }}>
-              <div style={{ background: cfg.bg, border: `1px solid ${cfg.border}`, borderRadius: 12, padding: '20px', display: 'flex', flexDirection: 'column', gap: 16, height: '100%', boxSizing: 'border-box' }}>
-                {/* Top */}
+            <motion.div
+              key={brand.name}
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.18, delay: i * 0.04 }}
+            >
+              <div
+                style={{
+                  background: cardBg,
+                  border: `1px solid ${cardBorder}`,
+                  borderRadius: 12,
+                  padding: '20px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 16,
+                  height: '100%',
+                  boxSizing: 'border-box',
+                }}
+              >
+                {/* Top header inside card */}
                 <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
-                  <div style={{ width: 40, height: 40, borderRadius: 10, background: cfg.iconBg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    <Building2 size={18} color={cfg.iconColor} />
+                  <div
+                    style={{
+                      width: 40,
+                      height: 40,
+                      borderRadius: 10,
+                      background: isDone ? '#f0fdf4' : isInProgress ? '#eef2ff' : '#f8fafc',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0,
+                    }}
+                  >
+                    <Building2 size={18} color={isDone ? '#16a34a' : isInProgress ? '#4f46e5' : '#94a3b8'} />
                   </div>
-                  <span style={{ fontSize: 10, fontWeight: 600, padding: '3px 8px', borderRadius: 9999, background: cfg.badgeBg, color: cfg.badgeColor, border: `1px solid ${cfg.badgeBorder}` }}>
-                    {cfg.label}
-                  </span>
+                  <StatusBadge status={brand.status} size="sm" />
                 </div>
 
-                {/* Brand name */}
+                {/* Brand name & details */}
                 <div>
-                  <h3 style={{ fontSize: 15, fontWeight: 700, color: '#0f172a', margin: '0 0 3px' }}>{brand.name}</h3>
-                  <p style={{ fontSize: 12, color: '#64748b', margin: 0 }}>{brand.countedProducts} / {brand.totalProducts} counted</p>
+                  <h3 style={{ fontSize: 15, fontWeight: 700, color: '#0f172a', margin: '0 0 3px' }}>
+                    {brand.name}
+                  </h3>
+                  <p style={{ fontSize: 12, color: '#64748b', margin: 0 }}>
+                    {brand.countedProducts} / {brand.totalProducts} counted
+                  </p>
                 </div>
 
-                {/* Progress */}
+                {/* Progress bar */}
                 <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
                     <span style={{ fontSize: 11, color: '#94a3b8', fontWeight: 500 }}>Progress</span>
-                    <span style={{ fontSize: 11, fontWeight: 700, color: cfg.iconColor }}>{brand.progress}%</span>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: barColor }}>{brand.progress}%</span>
                   </div>
                   <div style={{ height: 5, background: '#f1f5f9', borderRadius: 9999, overflow: 'hidden' }}>
-                    <div style={{ height: '100%', width: `${brand.progress}%`, background: cfg.barColor, borderRadius: 9999, transition: 'width 0.5s ease' }} />
+                    <div style={{ height: '100%', width: `${brand.progress}%`, background: barColor, borderRadius: 9999, transition: 'width 0.5s ease' }} />
                   </div>
                 </div>
 
-                {/* Button */}
+                {/* Start / Resume Button */}
                 <button
                   onClick={() => handleStart(brand.name, brand.sessionId)}
                   style={{
-                    width: '100%', padding: '9px 0', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                    border: brand.status === 'Completed' ? '1px solid #e2e8f0' : 'none',
-                    background: brand.status === 'Completed' ? '#fff' : '#4f46e5',
-                    color: brand.status === 'Completed' ? '#475569' : '#fff',
+                    width: '100%',
+                    padding: '9px 0',
+                    borderRadius: 8,
+                    fontSize: 13,
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 6,
+                    border: isDone ? '1px solid #e2e8f0' : 'none',
+                    background: isDone ? '#fff' : '#4f46e5',
+                    color: isDone ? '#475569' : '#fff',
                     boxSizing: 'border-box',
+                    fontFamily: 'inherit',
                   }}
                 >
-                  {brand.status === 'Not Started' ? 'Start Count' : brand.status === 'Completed' ? 'View Results' : 'Resume Count'}
+                  {brand.status === 'Not Started' ? 'Start Count' : isDone ? 'View Results' : 'Resume Count'}
                   <ArrowRight size={13} />
                 </button>
               </div>
@@ -214,54 +293,35 @@ export function BrandSelection() {
         })}
       </div>
 
-      {/* Reusable Modal Dialog Components */}
-      {showCloseConfirm && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: 16 }}>
-          <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 16, width: '100%', maxWidth: 440, boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)', padding: 24, boxSizing: 'border-box', display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--foreground)', margin: 0 }}>Close Stock Check?</h3>
-            <p style={{ fontSize: 13, color: 'var(--muted-foreground)', margin: 0, lineHeight: 1.5 }}>
-              Are you sure you want to CLOSE the current stock check? Once closed, this session will end, and you will need to upload a new Excel file to start a new check.
-            </p>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 4 }}>
-              <button onClick={() => setShowCloseConfirm(false)}
-                style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid var(--border)', background: 'transparent', color: 'var(--foreground)', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
-                Cancel
-              </button>
-              <button onClick={confirmCloseStockCheck}
-                style={{ padding: '8px 16px', borderRadius: 8, border: 'none', background: '#dc2626', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
-                Close Session
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Confirm Close Modal */}
+      <ConfirmModal
+        isOpen={showCloseConfirm}
+        title="Close Stock Check?"
+        description="Are you sure you want to CLOSE the current stock check? Once closed, this session will end, and you will need to upload a new Excel file to start a new check."
+        confirmText="Close Session"
+        cancelText="Cancel"
+        isDanger={true}
+        onConfirm={confirmCloseStockCheck}
+        onCancel={() => setShowCloseConfirm(false)}
+      />
 
-      {showSessionPrompt && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: 16 }}>
-          <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 16, width: '100%', maxWidth: 440, boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)', padding: 24, boxSizing: 'border-box', display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--foreground)', margin: 0 }}>New Count Session</h3>
-            <p style={{ fontSize: 13, color: 'var(--muted-foreground)', margin: 0 }}>
-              Create a new auditing session for brand <strong>{pendingBrandName}</strong>. You can optionally name this session below:
-            </p>
-            <input type="text" value={sessionNameInput} onChange={e => setSessionNameInput(e.target.value)} placeholder={`Count - ${pendingBrandName}`}
-              style={{ width: '100%', height: 40, padding: '0 12px', boxSizing: 'border-box', borderRadius: 8, border: '1.5px solid var(--border)', background: 'var(--background)', color: 'var(--foreground)', outline: 'none', fontSize: 13, fontFamily: 'inherit' }}
-              onKeyDown={e => { if (e.key === 'Enter') confirmStartSession(); }}
-            />
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 4 }}>
-              <button onClick={() => setShowSessionPrompt(false)}
-                style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid var(--border)', background: 'transparent', color: 'var(--foreground)', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
-                Cancel
-              </button>
-              <button onClick={confirmStartSession}
-                style={{ padding: '8px 16px', borderRadius: 8, border: 'none', background: '#4f46e5', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
-                Start Session
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
+      {/* New Session Prompt Modal */}
+      <ConfirmModal
+        isOpen={showSessionPrompt}
+        title="New Count Session"
+        description={
+          <>
+            Create a new auditing session for brand <strong>{pendingBrandName}</strong>. You can optionally name this session below:
+          </>
+        }
+        promptWord={`Count - ${pendingBrandName}`}
+        inputValue={sessionNameInput}
+        onInputChange={setSessionNameInput}
+        confirmText="Start Session"
+        cancelText="Cancel"
+        onConfirm={confirmStartSession}
+        onCancel={() => setShowSessionPrompt(false)}
+      />
     </div>
   );
 }

@@ -92,7 +92,7 @@ export function AppLayout() {
         <div style={{ padding: '20px 20px 16px', borderBottom: '1px solid #f1f5f9' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <img 
-              src={agency?.logo_url || `${import.meta.env.BASE_URL}britannia_logo.png`} 
+              src={agency?.logo_url || `${import.meta.env.BASE_URL}britannia_logo.webp`} 
               alt="Agency Logo"
               style={{ height: 28, objectFit: 'contain' }}
             />
@@ -165,7 +165,7 @@ export function AppLayout() {
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 16px', borderBottom: '1px solid #f1f5f9' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <img 
-                  src={agency?.logo_url || `${import.meta.env.BASE_URL}britannia_logo.png`} 
+                  src={agency?.logo_url || `${import.meta.env.BASE_URL}britannia_logo.webp`} 
                   alt="Agency Logo"
                   style={{ height: 24, objectFit: 'contain' }}
                 />
@@ -206,7 +206,7 @@ export function AppLayout() {
             </button>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }} className="topbar-logo">
               <img 
-                src={agency?.logo_url || `${import.meta.env.BASE_URL}britannia_logo.png`} 
+                src={agency?.logo_url || `${import.meta.env.BASE_URL}britannia_logo.webp`} 
                 alt="Agency Logo"
                 style={{ height: 24, objectFit: 'contain' }}
               />
@@ -269,7 +269,7 @@ export function AppLayout() {
         </main>
 
         {/* Mobile bottom nav */}
-        <nav style={{ position: 'fixed', bottom: 0, left: 0, right: 0, background: '#fff', borderTop: '1px solid #e8ecf0', display: 'flex', justifyContent: 'space-around', padding: '6px 0 10px', zIndex: 40 }} className="mobile-bottom-nav">
+        <nav style={{ position: 'fixed', bottom: 0, left: 0, right: 0, background: '#fff', borderTop: '1px solid #e8ecf0', display: 'flex', justifyContent: 'space-around', padding: '6px 0 calc(10px + env(safe-area-inset-bottom, 0px))', zIndex: 40 }} className="mobile-bottom-nav">
           {mobileNavItems.map(({ icon: Icon, label, to }) => {
             const active = isActive(location.pathname, to);
             return (

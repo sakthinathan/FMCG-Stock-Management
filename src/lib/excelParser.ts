@@ -95,7 +95,7 @@ export const parseExcelFile = async (file: File): Promise<ParseResult> => {
             goodQty: isNaN(goodQty) ? 0 : goodQty,
             conversion: conversion,
             systemQtyPcs: isNaN(goodQty) ? 0 : Math.round(goodQty),
-            prevVariance: Math.floor(Math.random() * 50) - 25, // Mock previous variance between -25 and +25 for testing
+            prevVariance: 0,
           });
         });
 

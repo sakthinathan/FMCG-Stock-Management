@@ -1,8 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useDeferredValue, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, ArrowLeft, Loader2, ListChecks, AlertTriangle, Package, Search, CheckCircle2, MessageSquare } from 'lucide-react';
 import { useStockStore } from '@/store/useStockStore';
 import { supabase } from '@/lib/supabase';
+import { LoadingSpinner } from '@/components/common/LoadingSpinner';
+import { StatusBadge } from '@/components/common/StatusBadge';
 
 const W: React.CSSProperties = { background: '#fff', borderRadius: 12, boxShadow: '0 1px 3px rgba(0,0,0,0.06)' };
 
@@ -32,6 +34,7 @@ export function StockCount() {
   const [brandName, setBrandName] = useState('');
   const [allProducts, setAllProducts] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const deferredSearchQuery = useDeferredValue(searchQuery);
   const [hideCounted, setHideCounted] = useState(false);
   const [issuesOnly, setIssuesOnly] = useState(false);
   const [sortQueue, setSortQueue] = useState<'A-Z' | 'Highest Value' | 'Highest Variance'>('A-Z');
@@ -48,7 +51,7 @@ export function StockCount() {
   const [notes, setNotes] = useState('');
   const [reasonCode, setReasonCode] = useState('');
 
-  // 1. Load session & products
+  // 1. Load session & products with column projections
   useEffect(() => {
     async function loadSession() {
       if (!sessionId || !activeUploadId) {
@@ -67,7 +70,7 @@ export function StockCount() {
 
         const { data: snapshotData, error: snapError } = await supabase
           .from('system_stock_snapshots')
-          .select('*')
+          .select('id, upload_id, material, material_desc, brand, mrp, good_qty, conversion, system_qty_pcs, prev_variance')
           .eq('upload_id', activeUploadId)
           .eq('brand', sessionData.brand);
 
@@ -75,7 +78,7 @@ export function StockCount() {
 
         const { data: countsData, error: countError } = await supabase
           .from('physical_stock_counts')
-          .select('*')
+          .select('id, session_id, snapshot_id, physical_cbb, physical_pcs, physical_total_pcs, variance, status, notes, reason_code')
           .eq('session_id', sessionId);
 
         if (countError) throw countError;
@@ -120,25 +123,28 @@ export function StockCount() {
     return str;
   };
 
-  // Filter products list
-  const filteredProducts = allProducts
-    .filter(p => {
-      const matchesSearch = p.material.toLowerCase().includes(searchQuery.toLowerCase()) || p.material_desc.toLowerCase().includes(searchQuery.toLowerCase());
-      const isCounted = p.existingCbb !== '' || p.existingPcs !== '';
-      if (hideCounted && isCounted) return false;
-      if (issuesOnly) {
-        if (!isCounted) return false;
-        if (p.existingVariance === 0 || p.existingVariance === null) return false;
-      }
-      return matchesSearch;
-    })
-    .sort((a, b) => {
-      if (sortQueue === 'Highest Value') return b.mrp - a.mrp;
-      if (sortQueue === 'Highest Variance') {
-        return Math.abs(b.prev_variance || 0) - Math.abs(a.prev_variance || 0);
-      }
-      return a.material.localeCompare(b.material);
-    });
+  // Filter products list with memoization & deferred input
+  const filteredProducts = useMemo(() => {
+    const q = deferredSearchQuery.toLowerCase();
+    return allProducts
+      .filter(p => {
+        const matchesSearch = !q || p.material.toLowerCase().includes(q) || p.material_desc.toLowerCase().includes(q);
+        const isCounted = p.existingCbb !== '' || p.existingPcs !== '';
+        if (hideCounted && isCounted) return false;
+        if (issuesOnly) {
+          if (!isCounted) return false;
+          if (p.existingVariance === 0 || p.existingVariance === null) return false;
+        }
+        return matchesSearch;
+      })
+      .sort((a, b) => {
+        if (sortQueue === 'Highest Value') return b.mrp - a.mrp;
+        if (sortQueue === 'Highest Variance') {
+          return Math.abs(b.prev_variance || 0) - Math.abs(a.prev_variance || 0);
+        }
+        return a.material.localeCompare(b.material);
+      });
+  }, [allProducts, deferredSearchQuery, hideCounted, issuesOnly, sortQueue]);
 
   const currentProduct = allProducts.find(p => p.id === selectedProductId) || filteredProducts[0];
   const currentIndex = currentProduct ? filteredProducts.findIndex(p => p.id === currentProduct.id) : -1;
@@ -288,7 +294,7 @@ export function StockCount() {
     }
   };
 
-  if (loading) return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh' }}><Loader2 size={32} color="#4f46e5" style={{ animation: 'spin 1s linear infinite' }} /></div>;
+  if (loading) return <LoadingSpinner height="60vh" label="Loading product session..." />;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20, fontFamily: "'Inter', sans-serif" }}>
@@ -449,22 +455,48 @@ export function StockCount() {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                 <div>
                   <label style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', display: 'block', marginBottom: 6 }}>Cartons (CBB)</label>
-                  <input
-                    type="text" placeholder="0"
-                    value={cbb} onChange={e => setCbb(e.target.value)}
-                    style={{ width: '100%', height: 64, border: '1.5px solid #e2e8f0', borderRadius: 12, fontSize: 28, fontWeight: 800, textAlign: 'center', outline: 'none', background: '#fff', boxSizing: 'border-box', fontFamily: 'inherit' }}
-                    onFocus={e => e.target.select()}
-                  />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <button
+                      type="button"
+                      onClick={() => setCbb(prev => String(Math.max(0, (parseInt(prev, 10) || 0) - 1)))}
+                      style={{ width: 44, height: 64, border: '1.5px solid #e2e8f0', borderRadius: 12, background: '#f8fafc', color: '#475569', fontSize: 20, fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}
+                    >-</button>
+                    <input
+                      type="text" placeholder="0"
+                      inputMode="numeric" pattern="[0-9]*"
+                      value={cbb} onChange={e => setCbb(e.target.value.replace(/[^0-9]/g, ''))}
+                      style={{ width: '100%', height: 64, border: '1.5px solid #e2e8f0', borderRadius: 12, fontSize: 28, fontWeight: 800, textAlign: 'center', outline: 'none', background: '#fff', boxSizing: 'border-box', fontFamily: 'inherit' }}
+                      onFocus={e => e.target.select()}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setCbb(prev => String((parseInt(prev, 10) || 0) + 1))}
+                      style={{ width: 44, height: 64, border: '1.5px solid #e2e8f0', borderRadius: 12, background: '#f8fafc', color: '#475569', fontSize: 20, fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}
+                    >+</button>
+                  </div>
                   <span style={{ fontSize: 10, color: '#94a3b8', display: 'block', marginTop: 4, textAlign: 'center' }}>= {cbbVal * currentProduct.conversion} PCS</span>
                 </div>
                 <div>
                   <label style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', display: 'block', marginBottom: 6 }}>Loose (PCS)</label>
-                  <input
-                    type="text" placeholder="0"
-                    value={pcs} onChange={e => setPcs(e.target.value)}
-                    style={{ width: '100%', height: 64, border: '1.5px solid #e2e8f0', borderRadius: 12, fontSize: 28, fontWeight: 800, textAlign: 'center', outline: 'none', background: '#fff', boxSizing: 'border-box', fontFamily: 'inherit' }}
-                    onFocus={e => e.target.select()}
-                  />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <button
+                      type="button"
+                      onClick={() => setPcs(prev => String(Math.max(0, (parseInt(prev, 10) || 0) - 1)))}
+                      style={{ width: 44, height: 64, border: '1.5px solid #e2e8f0', borderRadius: 12, background: '#f8fafc', color: '#475569', fontSize: 20, fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}
+                    >-</button>
+                    <input
+                      type="text" placeholder="0"
+                      inputMode="numeric" pattern="[0-9]*"
+                      value={pcs} onChange={e => setPcs(e.target.value.replace(/[^0-9]/g, ''))}
+                      style={{ width: '100%', height: 64, border: '1.5px solid #e2e8f0', borderRadius: 12, fontSize: 28, fontWeight: 800, textAlign: 'center', outline: 'none', background: '#fff', boxSizing: 'border-box', fontFamily: 'inherit' }}
+                      onFocus={e => e.target.select()}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setPcs(prev => String((parseInt(prev, 10) || 0) + 1))}
+                      style={{ width: 44, height: 64, border: '1.5px solid #e2e8f0', borderRadius: 12, background: '#f8fafc', color: '#475569', fontSize: 20, fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}
+                    >+</button>
+                  </div>
                   <span style={{ fontSize: 10, color: '#94a3b8', display: 'block', marginTop: 4, textAlign: 'center' }}>Single pieces</span>
                 </div>
               </div>

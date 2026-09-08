@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
-import { Moon, Sun, Monitor, Trash2, AlertTriangle, Loader2, User, Database, Shield } from 'lucide-react';
+import { Moon, Sun, Monitor, Trash2, AlertTriangle, Loader2, User, Shield, Settings as SettingsIcon } from 'lucide-react';
 import { useTheme } from '@/components/ThemeProvider';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { useStockStore } from '@/store/useStockStore';
 import { useNavigate } from 'react-router-dom';
+import { PageHeader } from '@/components/common/PageHeader';
+import { ConfirmModal } from '@/components/common/ConfirmModal';
 
 const W: React.CSSProperties = { background: '#fff', borderRadius: 12, boxShadow: '0 1px 3px rgba(0,0,0,0.06)' };
 
@@ -45,27 +47,28 @@ export function Settings() {
       navigate('/');
     } catch (e: any) {
       setModalMessage('Failed: ' + e.message);
-    } finally { setIsClearing(false); }
+    } finally {
+      setIsClearing(false);
+    }
   };
 
   const themeOptions = [
-    { key: 'light',  label: 'Light',  icon: Sun  },
-    { key: 'dark',   label: 'Dark',   icon: Moon },
+    { key: 'light', label: 'Light', icon: Sun },
+    { key: 'dark', label: 'Dark', icon: Moon },
     { key: 'system', label: 'System', icon: Monitor },
   ];
 
   return (
-    <div style={{ maxWidth: 860, display: 'flex', flexDirection: 'column', gap: 24, fontFamily: "'Inter', sans-serif" }}>
-
-      {/* Page header */}
-      <div>
-        <h1 style={{ fontSize: 22, fontWeight: 800, color: '#0f172a', margin: '0 0 4px', letterSpacing: '-0.3px' }}>Settings</h1>
-        <p style={{ fontSize: 13, color: '#64748b', margin: 0 }}>Manage application preferences and data</p>
-      </div>
+    <div style={{ maxWidth: 860, display: 'flex', flexDirection: 'column', gap: 24 }}>
+      {/* Header */}
+      <PageHeader
+        title="Settings"
+        description="Manage application preferences, security policies, and database state"
+        icon={SettingsIcon}
+      />
 
       {/* Two-col grid */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: 20 }}>
-
         {/* Appearance */}
         <div style={W}>
           <div style={{ padding: '18px 22px', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -83,14 +86,23 @@ export function Settings() {
               {themeOptions.map(({ key, label, icon: Icon }) => {
                 const active = theme === key;
                 return (
-                  <button key={key} onClick={() => setTheme(key as any)}
+                  <button
+                    key={key}
+                    onClick={() => setTheme(key as any)}
                     style={{
-                      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
-                      padding: '16px 8px', borderRadius: 10, cursor: 'pointer', fontFamily: 'inherit',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: 8,
+                      padding: '16px 8px',
+                      borderRadius: 10,
+                      cursor: 'pointer',
+                      fontFamily: 'inherit',
                       border: active ? '2px solid #4f46e5' : '1.5px solid #e2e8f0',
                       background: active ? '#eef2ff' : '#f8fafc',
                       color: active ? '#4f46e5' : '#64748b',
-                      fontSize: 12, fontWeight: active ? 700 : 500,
+                      fontSize: 12,
+                      fontWeight: active ? 700 : 500,
                     }}
                   >
                     <Icon size={20} />
@@ -161,7 +173,6 @@ export function Settings() {
             </div>
           </div>
         </div>
-
       </div>
 
       {/* Danger Zone */}
@@ -180,18 +191,30 @@ export function Settings() {
               Permanently deletes all uploaded files, stock snapshots, and physical counts from Supabase. Use only when starting a completely new audit cycle.
             </p>
           </div>
-          <button onClick={handleFactoryReset} disabled={isClearing}
+          <button
+            onClick={handleFactoryReset}
+            disabled={isClearing}
             style={{
-              display: 'flex', alignItems: 'center', gap: 8, padding: '10px 20px',
-              borderRadius: 9, border: 'none', background: isClearing ? '#fca5a5' : '#dc2626',
-              color: '#fff', fontSize: 13, fontWeight: 700, cursor: isClearing ? 'not-allowed' : 'pointer',
-              fontFamily: 'inherit', flexShrink: 0,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              padding: '10px 20px',
+              borderRadius: 9,
+              border: 'none',
+              background: isClearing ? '#fca5a5' : '#dc2626',
+              color: '#fff',
+              fontSize: 13,
+              fontWeight: 700,
+              cursor: isClearing ? 'not-allowed' : 'pointer',
+              fontFamily: 'inherit',
+              flexShrink: 0,
             }}
           >
-            {isClearing
-              ? <><Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> Clearing...</>
-              : <><Trash2 size={14} /> Clear Entire Database</>
-            }
+            {isClearing ? (
+              <><Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> Clearing...</>
+            ) : (
+              <><Trash2 size={14} /> Clear Entire Database</>
+            )}
           </button>
         </div>
       </div>
@@ -213,70 +236,41 @@ export function Settings() {
         ))}
       </div>
 
-      {/* Reusable Modal Dialog Components */}
-      {showResetConfirm && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: 16 }}>
-          <div style={{ background: 'var(--card)', border: '1px solid #fecaca', borderRadius: 16, width: '100%', maxWidth: 440, boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)', padding: 24, boxSizing: 'border-box', display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <h3 style={{ fontSize: 16, fontWeight: 700, color: '#dc2626', margin: 0 }}>Factory Reset Database?</h3>
-            <p style={{ fontSize: 13, color: 'var(--muted-foreground)', margin: 0, lineHeight: 1.5 }}>
-              WARNING: This will permanently delete ALL stock uploads, snapshots, and counts. This cannot be undone. Are you sure you want to proceed?
-            </p>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 4 }}>
-              <button onClick={() => setShowResetConfirm(false)}
-                style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid var(--border)', background: 'transparent', color: 'var(--foreground)', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
-                Cancel
-              </button>
-              <button onClick={proceedToPrompt}
-                style={{ padding: '8px 16px', borderRadius: 8, border: 'none', background: '#dc2626', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
-                Yes, Proceed
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Confirmation Modals */}
+      <ConfirmModal
+        isOpen={showResetConfirm}
+        title="Factory Reset Database?"
+        description="WARNING: This will permanently delete ALL stock uploads, snapshots, and counts. This cannot be undone. Are you sure you want to proceed?"
+        confirmText="Yes, Proceed"
+        cancelText="Cancel"
+        isDanger={true}
+        onConfirm={proceedToPrompt}
+        onCancel={() => setShowResetConfirm(false)}
+      />
 
-      {showResetPrompt && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: 16 }}>
-          <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 16, width: '100%', maxWidth: 440, boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)', padding: 24, boxSizing: 'border-box', display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--foreground)', margin: 0 }}>Confirm Destruction</h3>
-            <p style={{ fontSize: 13, color: 'var(--muted-foreground)', margin: 0 }}>
-              To confirm factory reset, please type <strong>DELETE</strong> in the box below:
-            </p>
-            <input type="text" value={deleteConfirmInput} onChange={e => setDeleteConfirmInput(e.target.value)} placeholder="DELETE"
-              style={{ width: '100%', height: 40, padding: '0 12px', boxSizing: 'border-box', borderRadius: 8, border: '1.5px solid var(--border)', background: 'var(--background)', color: 'var(--foreground)', outline: 'none', fontSize: 13, fontFamily: 'inherit' }}
-              onKeyDown={e => { if (e.key === 'Enter') confirmFactoryReset(); }}
-            />
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 4 }}>
-              <button onClick={() => setShowResetPrompt(false)}
-                style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid var(--border)', background: 'transparent', color: 'var(--foreground)', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
-                Cancel
-              </button>
-              <button onClick={confirmFactoryReset}
-                style={{ padding: '8px 16px', borderRadius: 8, border: 'none', background: '#dc2626', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
-                Confirm Reset
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmModal
+        isOpen={showResetPrompt}
+        title="Confirm Destruction"
+        description="To confirm factory reset, please type DELETE in the box below:"
+        promptWord="DELETE"
+        inputValue={deleteConfirmInput}
+        onInputChange={setDeleteConfirmInput}
+        confirmText="Confirm Reset"
+        cancelText="Cancel"
+        isDanger={true}
+        onConfirm={confirmFactoryReset}
+        onCancel={() => setShowResetPrompt(false)}
+      />
 
-      {modalMessage && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: 16 }}>
-          <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 16, width: '100%', maxWidth: 400, boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)', padding: 24, boxSizing: 'border-box', display: 'flex', flexDirection: 'column', gap: 16, textAlign: 'center' }}>
-            <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--foreground)', margin: 0 }}>Notification</h3>
-            <p style={{ fontSize: 13, color: 'var(--muted-foreground)', margin: 0, lineHeight: 1.5 }}>
-              {modalMessage}
-            </p>
-            <div style={{ display: 'flex', justifyContent: 'center', marginTop: 4 }}>
-              <button onClick={() => setModalMessage(null)}
-                style={{ padding: '8px 24px', borderRadius: 8, border: 'none', background: '#4f46e5', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
-                OK
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
+      <ConfirmModal
+        isOpen={!!modalMessage}
+        title="Notification"
+        description={modalMessage || ''}
+        confirmText="OK"
+        cancelText=""
+        onConfirm={() => setModalMessage(null)}
+        onCancel={() => setModalMessage(null)}
+      />
       <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
     </div>
   );

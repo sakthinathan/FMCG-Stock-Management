@@ -32,7 +32,7 @@ export function Login() {
       {/* Logo + Title */}
       <div style={{ textAlign: 'center', marginBottom: 28 }}>
         <img 
-          src={`${import.meta.env.BASE_URL}britannia_logo.png`} 
+          src={`${import.meta.env.BASE_URL}britannia_logo.webp`} 
           alt="Britannia Logo"
           style={{
             height: 64,

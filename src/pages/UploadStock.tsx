@@ -1,9 +1,11 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { UploadCloud, FileSpreadsheet, CheckCircle2, AlertCircle, Loader2, History } from 'lucide-react';
 import { parseExcelFile, type ParseResult } from '@/lib/excelParser';
 import { useStockStore } from '@/store/useStockStore';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
+import { PageHeader } from '@/components/common/PageHeader';
+import { StatusBadge } from '@/components/common/StatusBadge';
 
 const card: React.CSSProperties = { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, boxShadow: '0 1px 3px rgba(0,0,0,0.06)' };
 const btn = (primary = true): React.CSSProperties => ({
@@ -11,6 +13,7 @@ const btn = (primary = true): React.CSSProperties => ({
   borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', border: 'none',
   background: primary ? '#4f46e5' : '#fff', color: primary ? '#fff' : '#374151',
   ...(primary ? {} : { border: '1px solid #e2e8f0' }),
+  fontFamily: 'inherit',
 });
 
 export function UploadStock() {
@@ -21,20 +24,25 @@ export function UploadStock() {
   const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadHistory, setUploadHistory] = useState<any[]>([]);
-  const { activeUploadId, filename: activeFilename, setActiveUpload } = useStockStore();
+  const { activeUploadId, setActiveUpload } = useStockStore();
 
   const fetchHistory = async () => {
     const { data } = await supabase.from('stock_uploads').select('*').order('uploaded_at', { ascending: false });
     if (data) setUploadHistory(data);
   };
 
-  React.useEffect(() => { fetchHistory(); }, []);
+  useEffect(() => { fetchHistory(); }, []);
 
   const processFile = async (file: File) => {
-    setIsUploading(true); setError(null);
+    setIsUploading(true);
+    setError(null);
     try {
       const result = await parseExcelFile(file);
-      if (result.products.length === 0) { setError('No valid products found.'); setIsUploading(false); return; }
+      if (result.products.length === 0) {
+        setError('No valid products found.');
+        setIsUploading(false);
+        return;
+      }
 
       const { data: uploadData, error: uploadError } = await supabase.from('stock_uploads')
         .insert({ file_name: file.name, total_records: result.products.length, agency_id: profile?.agency_id }).select().single();
@@ -57,19 +65,31 @@ export function UploadStock() {
       } catch {}
 
       const rows = result.products.map(p => ({
-        upload_id: uploadData.id, material: p.material, material_desc: p.description,
-        brand: p.brand, mrp: p.mrp, good_qty: p.goodQty, conversion: p.conversion,
-        system_qty_pcs: p.systemQtyPcs, prev_variance: prevVariances.get(`${p.material}_${p.mrp}`) || 0,
+        upload_id: uploadData.id,
+        material: p.material,
+        material_desc: p.description,
+        brand: p.brand,
+        mrp: p.mrp,
+        good_qty: p.goodQty,
+        conversion: p.conversion,
+        system_qty_pcs: p.systemQtyPcs,
+        prev_variance: prevVariances.get(`${p.material}_${p.mrp}`) || 0,
       }));
-      const { error: snapErr } = await supabase.from('system_stock_snapshots').insert(rows);
-      if (snapErr) throw snapErr;
+      const BATCH_SIZE = 500;
+      for (let i = 0; i < rows.length; i += BATCH_SIZE) {
+        const batch = rows.slice(i, i + BATCH_SIZE);
+        const { error: snapErr } = await supabase.from('system_stock_snapshots').insert(batch);
+        if (snapErr) throw snapErr;
+      }
 
       setParseResult(result);
       setActiveUpload(uploadData.id, file.name, uploadData.uploaded_at);
       fetchHistory();
     } catch (err: any) {
       setError(err.message || 'Failed to process file.');
-    } finally { setIsUploading(false); }
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -85,15 +105,11 @@ export function UploadStock() {
   return (
     <div style={{ maxWidth: 680, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 20 }}>
       {/* Header */}
-      <div style={{ ...card, padding: '18px 24px', display: 'flex', alignItems: 'center', gap: 14 }}>
-        <div style={{ width: 40, height: 40, borderRadius: 10, background: '#eef2ff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-          <UploadCloud size={20} color="#4f46e5" />
-        </div>
-        <div>
-          <h1 style={{ fontSize: 20, fontWeight: 700, color: '#0f172a', margin: 0 }}>Upload System Stock</h1>
-          <p style={{ fontSize: 13, color: '#64748b', margin: '3px 0 0' }}>Import the latest Excel stock master file to begin reconciliation</p>
-        </div>
-      </div>
+      <PageHeader
+        title="Upload System Stock"
+        description="Import the latest Excel stock master file to begin reconciliation"
+        icon={UploadCloud}
+      />
 
       {/* Drop Zone */}
       <div style={card}>
@@ -177,7 +193,7 @@ export function UploadStock() {
                   </div>
                   <div style={{ flexShrink: 0 }}>
                     {isActive ? (
-                      <span style={{ fontSize: 11, fontWeight: 600, background: '#4f46e5', color: '#fff', padding: '4px 10px', borderRadius: 9999 }}>Active</span>
+                      <StatusBadge status="Completed" customLabel="Active" />
                     ) : (
                       <button style={{ ...btn(false), padding: '6px 14px', fontSize: 12 }} onClick={() => setActiveUpload(upload.id, upload.file_name, upload.uploaded_at)}>
                         Switch
