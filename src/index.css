@@ -214,4 +214,85 @@
   input[type=number] {
     -moz-appearance: textfield !important;
   }
+
+  /* Britannia Pill Buttons */
+  .brit-pill-inactive {
+    background-color: #e52321;
+    color: #ffffff;
+    border-radius: 9999px;
+    padding: 8px 18px;
+    font-weight: 700;
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border: 1.5px solid #e52321;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 8px rgba(229, 35, 33, 0.25);
+    cursor: pointer;
+  }
+  .brit-pill-inactive:hover {
+    background-color: #cc1e1c;
+    border-color: #cc1e1c;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(229, 35, 33, 0.35);
+  }
+
+  .brit-pill-active {
+    background-color: #ffffff;
+    color: #0f172a;
+    border-radius: 9999px;
+    padding: 8px 18px;
+    font-weight: 800;
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border: 2px solid #0f172a;
+    transition: all 0.2s ease;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    cursor: pointer;
+  }
+  .brit-pill-active:hover {
+    background-color: #f8fafc;
+    transform: translateY(-1px);
+  }
+
+  /* Britannia Soft Squircle Card */
+  .brit-card {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 20px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.04);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+  .brit-card:hover {
+    box-shadow: 0 14px 30px rgba(229, 35, 33, 0.08);
+  }
+
+  /* Britannia MRP Badge */
+  .brit-badge-mrp {
+    background-color: #ffc800;
+    color: #0f172a;
+    font-weight: 800;
+    padding: 3px 9px;
+    border-radius: 9999px;
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    box-shadow: 0 2px 4px rgba(255, 200, 0, 0.3);
+  }
+
+  /* Britannia Green Indicator */
+  .brit-icon-arrow-green {
+    width: 32px;
+    height: 32px;
+    border-radius: 9999px;
+    background-color: #76bc21;
+    color: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 6px rgba(118, 188, 33, 0.3);
+  }
 }

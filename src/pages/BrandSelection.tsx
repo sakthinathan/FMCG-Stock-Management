@@ -193,8 +193,23 @@ export function BrandSelection() {
         }
       />
 
+      {/* Britannia Category Pills */}
+      <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4, scrollbarWidth: 'none' }}>
+        {['All Brands', 'In Progress', 'Completed', 'Biscuits & Bakery', 'Dairy & Drinks'].map(cat => {
+          const active = cat === 'All Brands'; // Default active pill
+          return (
+            <button
+              key={cat}
+              className={active ? 'brit-pill-active' : 'brit-pill-inactive'}
+            >
+              {cat}
+            </button>
+          );
+        })}
+      </div>
+
       {/* Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 16 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(270px, 1fr))', gap: 18 }}>
         {brands.map((brand, i) => {
           const isDone = brand.status === 'Completed';
           const isInProgress = brand.status === 'In Progress';
@@ -211,17 +226,17 @@ export function BrandSelection() {
               transition={{ duration: 0.18, delay: i * 0.04 }}
             >
               <div
+                className="brit-card"
                 style={{
                   background: cardBg,
-                  border: `1px solid ${cardBorder}`,
-                  borderRadius: 12,
-                  padding: '20px',
+                  border: `1.5px solid ${cardBorder}`,
+                  borderRadius: 20,
+                  padding: '22px',
                   display: 'flex',
                   flexDirection: 'column',
                   gap: 16,
                   height: '100%',
                   boxSizing: 'border-box',
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
                 }}
               >
                 {/* Top header inside card */}

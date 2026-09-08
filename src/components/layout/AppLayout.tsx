@@ -332,8 +332,8 @@ export function AppLayout() {
         </header>
 
         {/* Page content */}
-        <main style={{ flex: 1, overflowY: 'auto', background: '#fdfbf7' }}>
-          <div style={{ maxWidth: 1200, margin: '0 auto', padding: '28px 28px 80px' }} className="main-content">
+        <main style={{ flex: 1, overflowY: 'auto', background: '#fdfbf7', display: 'flex', flexDirection: 'column' }}>
+          <div style={{ maxWidth: 1200, margin: '0 auto', width: '100%', padding: '28px 28px 40px', flex: 1, boxSizing: 'border-box' }} className="main-content">
             <AnimatePresence mode="wait">
               <motion.div
                 key={location.pathname}
@@ -346,6 +346,21 @@ export function AppLayout() {
               </motion.div>
             </AnimatePresence>
           </div>
+
+          {/* Britannia Gold Wave Footer Banner */}
+          <footer style={{ background: '#0f172a', borderTop: '4px solid #ffc800', color: '#94a3b8', padding: '16px 32px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span style={{ background: '#e52321', color: '#fff', fontSize: 10, fontWeight: 800, padding: '3px 9px', borderRadius: 9999, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                Britannia Quality
+              </span>
+              <span style={{ fontSize: 12, fontWeight: 700, color: '#f1f5f9', letterSpacing: '0.03em' }}>
+                EXCITING GOODNESS IN EVERY COUNT
+              </span>
+            </div>
+            <p style={{ fontSize: 11, color: '#64748b', margin: 0, fontWeight: 500 }}>
+              © 2026 {agency?.name || 'Thulir Agency'} · Enterprise Stock Audit Platform
+            </p>
+          </footer>
         </main>
 
         {/* Mobile bottom nav */}
