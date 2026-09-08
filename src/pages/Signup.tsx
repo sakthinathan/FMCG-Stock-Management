@@ -100,7 +100,12 @@ export function Signup() {
         }
       });
 
-      if (authError) throw authError;
+      if (authError) {
+        if (authError.message.includes('rate limit exceeded') || authError.message.includes('email rate limit')) {
+          throw new Error('Supabase Signup Rate Limit Exceeded: Please disable "Confirm email" in Supabase Dashboard -> Authentication -> Providers -> Email to remove email limits.');
+        }
+        throw authError;
+      }
       if (!authData.user) throw new Error('User registration failed.');
 
       alert(`Agency "${agencyName}" registered successfully with AW Code: ${cleanAwCode}`);
