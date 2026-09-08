@@ -276,15 +276,18 @@ export function AppLayout() {
               {/* Dropdown Menu */}
               {userMenuOpen && (
                 <div style={{
-                  position: 'absolute', top: 48, right: 0, width: 240, background: '#fff',
+                  position: 'absolute', top: 48, right: 0, width: 260, background: '#fff',
                   borderRadius: 12, boxShadow: '0 10px 25px -5px rgba(0,0,0,0.15), 0 8px 10px -6px rgba(0,0,0,0.1)',
                   border: '1px solid #e2e8f0', zIndex: 60, padding: '6px'
                 }}>
-                  <div style={{ padding: '10px 12px 8px', borderBottom: '1px solid #f1f5f9' }}>
-                    <p style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user?.email || 'admin@thulir.com'}</p>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
+                  <div style={{ padding: '10px 12px 10px', borderBottom: '1px solid #f1f5f9' }}>
+                    <p style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', margin: '0 0 2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user?.email || 'admin@thulir.com'}</p>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
                       <span style={{ fontSize: 10, fontWeight: 600, background: '#eef2ff', color: '#4f46e5', padding: '2px 6px', borderRadius: 4 }}>{profile?.role || 'Administrator'}</span>
-                      <span style={{ fontSize: 10, color: '#64748b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{agency?.name || 'THULIR AGENCY'}</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#f8fafc', padding: '6px 8px', borderRadius: 6, border: '1px solid #f1f5f9' }}>
+                      <Building size={13} color="#4f46e5" style={{ flexShrink: 0 }} />
+                      <span style={{ fontSize: 11, fontWeight: 700, color: '#1e293b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{agency?.name || 'THULIR AGENCY'}</span>
                     </div>
                   </div>
 
@@ -295,7 +298,11 @@ export function AppLayout() {
                       onMouseEnter={e => (e.currentTarget.style.background = '#f8fafc')}
                       onMouseLeave={e => (e.currentTarget.style.background = 'none')}
                     >
-                      <User size={15} color="#64748b" /> Profile & Agency
+                      <Building size={15} color="#64748b" style={{ flexShrink: 0 }} />
+                      <div style={{ textAlign: 'left', minWidth: 0, flex: 1 }}>
+                        <p style={{ margin: 0, fontWeight: 600, fontSize: 13, color: '#0f172a' }}>Agency Profile</p>
+                        <p style={{ margin: 0, fontSize: 10, color: '#64748b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{agency?.name || 'THULIR AGENCY'}</p>
+                      </div>
                     </button>
                     <button
                       onClick={() => { setUserMenuOpen(false); navigate('/settings'); }}
@@ -303,7 +310,8 @@ export function AppLayout() {
                       onMouseEnter={e => (e.currentTarget.style.background = '#f8fafc')}
                       onMouseLeave={e => (e.currentTarget.style.background = 'none')}
                     >
-                      <Settings size={15} color="#64748b" /> System Settings
+                      <Settings size={15} color="#64748b" style={{ flexShrink: 0 }} />
+                      <span style={{ fontSize: 13, fontWeight: 500, color: '#334155' }}>System Settings</span>
                     </button>
                   </div>
 
@@ -314,7 +322,7 @@ export function AppLayout() {
                       onMouseEnter={e => (e.currentTarget.style.background = '#fef2f2')}
                       onMouseLeave={e => (e.currentTarget.style.background = 'none')}
                     >
-                      <LogOut size={15} color="#ef4444" /> Sign Out
+                      <LogOut size={15} color="#ef4444" style={{ flexShrink: 0 }} /> Sign Out
                     </button>
                   </div>
                 </div>
