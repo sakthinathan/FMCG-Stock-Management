@@ -464,7 +464,18 @@ export function StockCount() {
                     <input
                       type="text" placeholder="0"
                       inputMode="numeric" pattern="[0-9]*"
-                      value={cbb} onChange={e => setCbb(e.target.value.replace(/[^0-9]/g, ''))}
+                      value={cbb}
+                      onKeyDown={e => {
+                        if (!/[0-9]/.test(e.key) && !['Backspace', 'Delete', 'Tab', 'ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key) && !e.metaKey && !e.ctrlKey) {
+                          e.preventDefault();
+                        }
+                      }}
+                      onPaste={e => {
+                        e.preventDefault();
+                        const pasted = e.clipboardData.getData('text').replace(/[^0-9]/g, '');
+                        setCbb(pasted);
+                      }}
+                      onChange={e => setCbb(e.target.value.replace(/[^0-9]/g, ''))}
                       style={{ width: '100%', height: 64, border: '1.5px solid #e2e8f0', borderRadius: 12, fontSize: 28, fontWeight: 800, textAlign: 'center', outline: 'none', background: '#fff', boxSizing: 'border-box', fontFamily: 'inherit' }}
                       onFocus={e => e.target.select()}
                     />
@@ -487,7 +498,18 @@ export function StockCount() {
                     <input
                       type="text" placeholder="0"
                       inputMode="numeric" pattern="[0-9]*"
-                      value={pcs} onChange={e => setPcs(e.target.value.replace(/[^0-9]/g, ''))}
+                      value={pcs}
+                      onKeyDown={e => {
+                        if (!/[0-9]/.test(e.key) && !['Backspace', 'Delete', 'Tab', 'ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key) && !e.metaKey && !e.ctrlKey) {
+                          e.preventDefault();
+                        }
+                      }}
+                      onPaste={e => {
+                        e.preventDefault();
+                        const pasted = e.clipboardData.getData('text').replace(/[^0-9]/g, '');
+                        setPcs(pasted);
+                      }}
+                      onChange={e => setPcs(e.target.value.replace(/[^0-9]/g, ''))}
                       style={{ width: '100%', height: 64, border: '1.5px solid #e2e8f0', borderRadius: 12, fontSize: 28, fontWeight: 800, textAlign: 'center', outline: 'none', background: '#fff', boxSizing: 'border-box', fontFamily: 'inherit' }}
                       onFocus={e => e.target.select()}
                     />
