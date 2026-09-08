@@ -17,7 +17,9 @@ export function Signup() {
     setLoading(true);
     setError(null);
     try {
-      // 1. Create Agency first (public insert allowed)
+      // 1. Create Agency (Try direct insert, fallback to RPC if RLS blocks anon insert)
+      let agencyId: string | null = null;
+
       const { data: agencyData, error: agencyError } = await supabase
         .from('agencies')
         .insert({
@@ -26,7 +28,22 @@ export function Signup() {
         })
         .select()
         .single();
-      if (agencyError) throw agencyError;
+
+      if (agencyError) {
+        // Fallback to RPC function if RLS policy blocks direct table insert
+        const { data: rpcId, error: rpcError } = await supabase
+          .rpc('create_agency', {
+            agency_name: agencyName,
+            logo_url: logoUrl || null
+          });
+
+        if (rpcError) {
+          throw new Error('RLS Permission Error: Please run the SQL snippet in Supabase SQL Editor to allow agency registration.');
+        }
+        agencyId = rpcId;
+      } else {
+        agencyId = agencyData.id;
+      }
 
       // 2. Sign up user in Auth with agency metadata
       const { data: authData, error: authError } = await supabase.auth.signUp({
@@ -34,7 +51,7 @@ export function Signup() {
         password,
         options: {
           data: {
-            agency_id: agencyData.id,
+            agency_id: agencyId,
             role: 'Owner'
           }
         }

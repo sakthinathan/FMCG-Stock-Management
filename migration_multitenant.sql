@@ -72,15 +72,29 @@ DROP POLICY IF EXISTS "Allow public all on physical_stock_counts" ON physical_st
 -- Setup clean policies using helper:
 
 -- Agencies Policies
-CREATE POLICY "Allow users to read their own agency" ON agencies
-    FOR SELECT USING (
-        id = get_user_agency_id()
-    );
-
+DROP POLICY IF EXISTS "Allow anyone to create agencies" ON agencies;
 CREATE POLICY "Allow anyone to create agencies" ON agencies
-    FOR INSERT WITH CHECK (
-        true
-    );
+    FOR INSERT TO anon, authenticated WITH CHECK (true);
+
+-- RPC Function to safely insert new agencies during registration
+CREATE OR REPLACE FUNCTION public.create_agency(agency_name TEXT, logo_url TEXT DEFAULT NULL)
+RETURNS UUID
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+    new_agency_id UUID;
+BEGIN
+    INSERT INTO public.agencies (name, logo_url)
+    VALUES (agency_name, logo_url)
+    RETURNING id INTO new_agency_id;
+
+    RETURN new_agency_id;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.create_agency(TEXT, TEXT) TO anon, authenticated;
 
 -- Profiles Policies
 CREATE POLICY "Allow users to select profiles in same agency" ON profiles
