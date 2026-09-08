@@ -455,70 +455,46 @@ export function StockCount() {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                 <div>
                   <label style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', display: 'block', marginBottom: 6 }}>Cartons (CBB)</label>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <button
-                      type="button"
-                      onClick={() => setCbb(prev => String(Math.max(0, (parseInt(prev, 10) || 0) - 1)))}
-                      style={{ width: 44, height: 64, border: '1.5px solid #e2e8f0', borderRadius: 12, background: '#f8fafc', color: '#475569', fontSize: 20, fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}
-                    >-</button>
-                    <input
-                      type="text" placeholder="0"
-                      inputMode="numeric" pattern="[0-9]*"
-                      value={cbb}
-                      onKeyDown={e => {
-                        if (!/[0-9]/.test(e.key) && !['Backspace', 'Delete', 'Tab', 'ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key) && !e.metaKey && !e.ctrlKey) {
-                          e.preventDefault();
-                        }
-                      }}
-                      onPaste={e => {
+                  <input
+                    type="text" placeholder="0"
+                    inputMode="numeric" pattern="[0-9]*"
+                    value={cbb}
+                    onKeyDown={e => {
+                      if (!/[0-9]/.test(e.key) && !['Backspace', 'Delete', 'Tab', 'ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key) && !e.metaKey && !e.ctrlKey) {
                         e.preventDefault();
-                        const pasted = e.clipboardData.getData('text').replace(/[^0-9]/g, '');
-                        setCbb(pasted);
-                      }}
-                      onChange={e => setCbb(e.target.value.replace(/[^0-9]/g, ''))}
-                      style={{ width: '100%', height: 64, border: '1.5px solid #e2e8f0', borderRadius: 12, fontSize: 28, fontWeight: 800, textAlign: 'center', outline: 'none', background: '#fff', boxSizing: 'border-box', fontFamily: 'inherit' }}
-                      onFocus={e => e.target.select()}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setCbb(prev => String((parseInt(prev, 10) || 0) + 1))}
-                      style={{ width: 44, height: 64, border: '1.5px solid #e2e8f0', borderRadius: 12, background: '#f8fafc', color: '#475569', fontSize: 20, fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}
-                    >+</button>
-                  </div>
+                      }
+                    }}
+                    onPaste={e => {
+                      e.preventDefault();
+                      const pasted = e.clipboardData.getData('text').replace(/[^0-9]/g, '');
+                      setCbb(pasted);
+                    }}
+                    onChange={e => setCbb(e.target.value.replace(/[^0-9]/g, ''))}
+                    style={{ width: '100%', height: 64, border: '1.5px solid #e2e8f0', borderRadius: 12, fontSize: 28, fontWeight: 800, textAlign: 'center', outline: 'none', background: '#fff', boxSizing: 'border-box', fontFamily: 'inherit' }}
+                    onFocus={e => e.target.select()}
+                  />
                   <span style={{ fontSize: 10, color: '#94a3b8', display: 'block', marginTop: 4, textAlign: 'center' }}>= {cbbVal * currentProduct.conversion} PCS</span>
                 </div>
                 <div>
                   <label style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', display: 'block', marginBottom: 6 }}>Loose (PCS)</label>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <button
-                      type="button"
-                      onClick={() => setPcs(prev => String(Math.max(0, (parseInt(prev, 10) || 0) - 1)))}
-                      style={{ width: 44, height: 64, border: '1.5px solid #e2e8f0', borderRadius: 12, background: '#f8fafc', color: '#475569', fontSize: 20, fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}
-                    >-</button>
-                    <input
-                      type="text" placeholder="0"
-                      inputMode="numeric" pattern="[0-9]*"
-                      value={pcs}
-                      onKeyDown={e => {
-                        if (!/[0-9]/.test(e.key) && !['Backspace', 'Delete', 'Tab', 'ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key) && !e.metaKey && !e.ctrlKey) {
-                          e.preventDefault();
-                        }
-                      }}
-                      onPaste={e => {
+                  <input
+                    type="text" placeholder="0"
+                    inputMode="numeric" pattern="[0-9]*"
+                    value={pcs}
+                    onKeyDown={e => {
+                      if (!/[0-9]/.test(e.key) && !['Backspace', 'Delete', 'Tab', 'ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key) && !e.metaKey && !e.ctrlKey) {
                         e.preventDefault();
-                        const pasted = e.clipboardData.getData('text').replace(/[^0-9]/g, '');
-                        setPcs(pasted);
-                      }}
-                      onChange={e => setPcs(e.target.value.replace(/[^0-9]/g, ''))}
-                      style={{ width: '100%', height: 64, border: '1.5px solid #e2e8f0', borderRadius: 12, fontSize: 28, fontWeight: 800, textAlign: 'center', outline: 'none', background: '#fff', boxSizing: 'border-box', fontFamily: 'inherit' }}
-                      onFocus={e => e.target.select()}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setPcs(prev => String((parseInt(prev, 10) || 0) + 1))}
-                      style={{ width: 44, height: 64, border: '1.5px solid #e2e8f0', borderRadius: 12, background: '#f8fafc', color: '#475569', fontSize: 20, fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}
-                    >+</button>
-                  </div>
+                      }
+                    }}
+                    onPaste={e => {
+                      e.preventDefault();
+                      const pasted = e.clipboardData.getData('text').replace(/[^0-9]/g, '');
+                      setPcs(pasted);
+                    }}
+                    onChange={e => setPcs(e.target.value.replace(/[^0-9]/g, ''))}
+                    style={{ width: '100%', height: 64, border: '1.5px solid #e2e8f0', borderRadius: 12, fontSize: 28, fontWeight: 800, textAlign: 'center', outline: 'none', background: '#fff', boxSizing: 'border-box', fontFamily: 'inherit' }}
+                    onFocus={e => e.target.select()}
+                  />
                   <span style={{ fontSize: 10, color: '#94a3b8', display: 'block', marginTop: 4, textAlign: 'center' }}>Single pieces</span>
                 </div>
               </div>
