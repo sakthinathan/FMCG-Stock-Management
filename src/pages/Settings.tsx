@@ -72,8 +72,8 @@ export function Settings() {
         {/* Appearance */}
         <div style={W}>
           <div style={{ padding: '18px 22px', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{ width: 34, height: 34, borderRadius: 9, background: '#eef2ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Sun size={16} color="#4f46e5" />
+            <div style={{ width: 34, height: 34, borderRadius: 9, background: '#fef2f2', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Sun size={16} color="#e52321" />
             </div>
             <div>
               <h2 style={{ fontSize: 14, fontWeight: 700, color: '#0f172a', margin: 0 }}>Appearance</h2>
@@ -98,9 +98,9 @@ export function Settings() {
                       borderRadius: 10,
                       cursor: 'pointer',
                       fontFamily: 'inherit',
-                      border: active ? '2px solid #4f46e5' : '1.5px solid #e2e8f0',
-                      background: active ? '#eef2ff' : '#f8fafc',
-                      color: active ? '#4f46e5' : '#64748b',
+                      border: active ? '2px solid #e52321' : '1.5px solid #e2e8f0',
+                      background: active ? '#fef2f2' : '#f8fafc',
+                      color: active ? '#e52321' : '#64748b',
                       fontSize: 12,
                       fontWeight: active ? 700 : 500,
                     }}
@@ -224,7 +224,7 @@ export function Settings() {
         {[
           { label: 'Database', value: 'Supabase PostgreSQL', status: 'HEALTHY', color: '#16a34a' },
           { label: 'Cloud Storage', value: 'Supabase Buckets', status: 'ACTIVE', color: '#16a34a' },
-          { label: 'Auth Engine', value: 'Supabase Auth', status: 'VERIFIED', color: '#4f46e5' },
+          { label: 'Auth Engine', value: 'Supabase Auth', status: 'VERIFIED', color: '#e52321' },
         ].map(r => (
           <div key={r.label} style={{ ...W, padding: '14px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div>

@@ -15,8 +15,8 @@ export function PageHeader({
   title,
   description,
   icon: Icon,
-  iconColor = '#4f46e5',
-  iconBg = '#eef2ff',
+  iconColor = '#e52321',
+  iconBg = '#fef2f2',
   actions,
   children,
 }: PageHeaderProps) {

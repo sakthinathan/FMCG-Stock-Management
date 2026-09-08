@@ -2,7 +2,7 @@
 @import "shadcn/tailwind.css";
 
 :root {
-  --background: #f8fafc;
+  --background: #fdfbf7;
   --foreground: #0f172a;
 
   --card: #ffffff;
@@ -11,24 +11,24 @@
   --popover: #ffffff;
   --popover-foreground: #0f172a;
 
-  --primary: #4f46e5;
+  --primary: #e52321;
   --primary-foreground: #ffffff;
 
-  --secondary: #f1f5f9;
-  --secondary-foreground: #334155;
+  --secondary: #fef2f2;
+  --secondary-foreground: #991b1b;
 
-  --muted: #f1f5f9;
+  --muted: #f8fafc;
   --muted-foreground: #64748b;
 
-  --accent: #f1f5f9;
-  --accent-foreground: #334155;
+  --accent: #fef2f2;
+  --accent-foreground: #e52321;
 
-  --destructive: #ef4444;
+  --destructive: #dc2626;
   --destructive-foreground: #ffffff;
 
   --border: #e2e8f0;
   --input: #e2e8f0;
-  --ring: #4f46e5;
+  --ring: #e52321;
 
   --radius: 0.625rem;
 }
@@ -41,7 +41,7 @@
   --card-foreground: #cbd5e1;
   --popover: #151e2e;
   --popover-foreground: #f8fafc;
-  --primary: #6366f1;
+  --primary: #e52321;
   --primary-foreground: #ffffff;
   --secondary: #151e2e;
   --secondary-foreground: #cbd5e1;
@@ -53,7 +53,7 @@
   --destructive-foreground: #ffffff;
   --border: #243049;
   --input: #243049;
-  --ring: #6366f1;
+  --ring: #e52321;
 }
 
 /* Global overrides for dark mode inline styles */
@@ -125,7 +125,7 @@
 
 
 @theme inline {
-  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-sans: 'Outfit', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 
   --color-ring: var(--ring);
   --color-input: var(--input);
@@ -161,7 +161,7 @@
   html, body {
     background-color: var(--background);
     color: var(--foreground);
-    font-family: 'Inter', sans-serif;
+    font-family: 'Outfit', 'Inter', sans-serif;
     min-height: 100vh;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;

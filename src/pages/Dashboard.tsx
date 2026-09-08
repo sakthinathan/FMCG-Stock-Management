@@ -139,13 +139,15 @@ export function Dashboard() {
               padding: '10px 20px',
               borderRadius: 10,
               border: 'none',
-              background: '#4f46e5',
+              background: '#e52321',
               color: '#fff',
               fontSize: 13,
-              fontWeight: 600,
+              fontWeight: 700,
               cursor: 'pointer',
               fontFamily: 'inherit',
-              boxShadow: '0 2px 8px rgba(79,70,229,0.3)',
+              textTransform: 'uppercase',
+              letterSpacing: '0.02em',
+              boxShadow: '0 4px 12px rgba(229,35,33,0.25)',
             }}
           >
             Continue Count <ArrowRight size={14} />
@@ -155,10 +157,10 @@ export function Dashboard() {
 
       {/* KPI Cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16 }}>
-        <KpiStatCard label="Total Brands" value={stats.totalBrands} sub="Active categories" borderColor="#4f46e5" icon={Building2} />
+        <KpiStatCard label="Total Brands" value={stats.totalBrands} sub="Active categories" borderColor="#e52321" icon={Building2} />
         <KpiStatCard label="Total SKUs" value={stats.totalProducts} sub="In master file" borderColor="#10b981" icon={Package} />
         <KpiStatCard label="Pending Count" value={stats.pendingProducts} sub="Awaiting audit" borderColor="#f59e0b" icon={AlertCircle} />
-        <KpiStatCard label="Total Issues" value={stats.shortage + stats.excess} sub="Variances found" borderColor="#ef4444" icon={AlertTriangle} />
+        <KpiStatCard label="Total Issues" value={stats.shortage + stats.excess} sub="Variances found" borderColor="#dc2626" icon={AlertTriangle} />
       </div>
 
       {/* Progress & Discrepancy Summary */}
@@ -169,9 +171,9 @@ export function Dashboard() {
           <p style={{ fontSize: 12, color: '#64748b', margin: '0 0 16px' }}>{stats.countedProducts} of {stats.totalProducts} SKUs counted</p>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <div style={{ flex: 1, height: 8, background: '#f1f5f9', borderRadius: 9999, overflow: 'hidden' }}>
-              <div style={{ height: '100%', width: `${pct}%`, background: 'linear-gradient(90deg, #4f46e5, #7c3aed)', borderRadius: 9999, transition: 'width 0.6s ease' }} />
+              <div style={{ height: '100%', width: `${pct}%`, background: 'linear-gradient(90deg, #e52321, #991b1b)', borderRadius: 9999, transition: 'width 0.6s ease' }} />
             </div>
-            <span style={{ fontSize: 16, fontWeight: 800, color: '#4f46e5', flexShrink: 0 }}>{pct}%</span>
+            <span style={{ fontSize: 16, fontWeight: 800, color: '#e52321', flexShrink: 0 }}>{pct}%</span>
           </div>
         </div>
 

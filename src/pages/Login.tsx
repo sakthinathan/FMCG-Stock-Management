@@ -25,8 +25,8 @@ export function Login() {
 
   return (
     <div style={{
-      minHeight: '100vh', fontFamily: "'Inter', -apple-system, sans-serif",
-      background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%)',
+      minHeight: '100vh', fontFamily: "'Outfit', 'Inter', sans-serif",
+      background: 'linear-gradient(135deg, #181111 0%, #0f172a 50%, #7f1d1d 100%)',
       display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24,
     }}>
       {/* Logo + Title */}
@@ -35,23 +35,24 @@ export function Login() {
           src={`${import.meta.env.BASE_URL}britannia_logo.webp`} 
           alt="Britannia Logo"
           style={{
-            height: 64,
+            height: 72,
             objectFit: 'contain',
             margin: '0 auto 18px',
             display: 'block'
           }}
         />
-        <h1 style={{ fontSize: 26, fontWeight: 800, color: '#fff', margin: '0 0 4px', letterSpacing: '-0.5px' }}>THULIR AGENCY</h1>
-        <p style={{ fontSize: 13, color: '#94a3b8', margin: 0, letterSpacing: '0.02em', textTransform: 'uppercase', fontWeight: 600 }}>Stock Management</p>
+        <h1 style={{ fontSize: 28, fontWeight: 800, color: '#fff', margin: '0 0 4px', letterSpacing: '0.04em', textTransform: 'uppercase' }}>THULIR AGENCY</h1>
+        <p style={{ fontSize: 13, color: '#fca5a5', margin: 0, letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 700 }}>Stock Management</p>
       </div>
 
       {/* Card */}
       <div style={{
-        width: '100%', maxWidth: 420, background: '#f8fafc',
+        width: '100%', maxWidth: 420, background: '#ffffff',
         borderRadius: 20, padding: '32px 28px',
-        boxShadow: '0 24px 64px rgba(0,0,0,0.4)',
+        boxShadow: '0 24px 64px rgba(0,0,0,0.5)',
+        border: '1px solid #fecaca',
       }}>
-        <h2 style={{ fontSize: 22, fontWeight: 700, color: '#0f172a', margin: '0 0 4px' }}>Welcome back</h2>
+        <h2 style={{ fontSize: 22, fontWeight: 800, color: '#0f172a', margin: '0 0 4px', textTransform: 'uppercase' }}>Welcome back</h2>
         <p style={{ fontSize: 13, color: '#64748b', margin: '0 0 24px' }}>Please enter your credentials</p>
 
         {error && (
@@ -103,11 +104,11 @@ export function Login() {
             type="submit" disabled={loading}
             style={{
               width: '100%', height: 48, marginTop: 6, borderRadius: 12, border: 'none',
-              background: loading ? '#6366f1' : '#0f172a', color: '#fff',
+              background: loading ? '#991b1b' : '#e52321', color: '#fff',
               fontSize: 15, fontWeight: 700, cursor: loading ? 'not-allowed' : 'pointer',
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-              fontFamily: 'inherit', letterSpacing: '0.01em',
-              boxShadow: '0 2px 12px rgba(0,0,0,0.15)',
+              fontFamily: 'inherit', letterSpacing: '0.02em', textTransform: 'uppercase',
+              boxShadow: '0 4px 14px rgba(229,35,33,0.35)',
             }}
           >
             {loading
@@ -117,12 +118,12 @@ export function Login() {
           </button>
         </form>
         <div style={{ marginTop: 20, textAlign: 'center', fontSize: 13, color: '#64748b' }}>
-          Don't have an agency? <Link to="/signup" style={{ color: '#4f46e5', fontWeight: 600, textDecoration: 'none' }}>Register here</Link>
+          Don't have an agency? <Link to="/signup" style={{ color: '#e52321', fontWeight: 700, textDecoration: 'none' }}>Register here</Link>
         </div>
       </div>
 
-      <p style={{ marginTop: 24, fontSize: 11, color: '#475569', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
-        Secure Cloud Access
+      <p style={{ marginTop: 24, fontSize: 11, color: '#fca5a5', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+        Britannia FMCG Stock Counter Portal
       </p>
 
       <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>

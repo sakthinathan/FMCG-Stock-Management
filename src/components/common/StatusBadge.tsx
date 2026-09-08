@@ -25,7 +25,7 @@ const statusConfigs: Record<string, { bg: string; color: string; border: string;
   'Equal':     { bg: '#f0fdf4', color: '#16a34a', border: '#bbf7d0', label: 'Equal' },
   'Shortage':  { bg: '#fef2f2', color: '#dc2626', border: '#fecaca', label: 'Shortage' },
   'Excess':    { bg: '#fffbeb', color: '#d97706', border: '#fde68a', label: 'Excess' },
-  'In Progress': { bg: '#eef2ff', color: '#4338ca', border: '#c7d2fe', label: '⏸ In Progress' },
+  'In Progress': { bg: '#fef2f2', color: '#e52321', border: '#fecaca', label: '⏸ In Progress' },
   'Completed': { bg: '#f0fdf4', color: '#16a34a', border: '#bbf7d0', label: '✓ Completed' },
   'Not Started': { bg: '#f8fafc', color: '#64748b', border: '#e2e8f0', label: 'Not Started' },
   'Uncounted':  { bg: '#f8fafc', color: '#64748b', border: '#e2e8f0', label: 'Uncounted' },

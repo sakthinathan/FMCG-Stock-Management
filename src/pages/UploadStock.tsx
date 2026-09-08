@@ -9,10 +9,10 @@ import { StatusBadge } from '@/components/common/StatusBadge';
 
 const card: React.CSSProperties = { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, boxShadow: '0 1px 3px rgba(0,0,0,0.06)' };
 const btn = (primary = true): React.CSSProperties => ({
-  display: 'inline-flex', alignItems: 'center', gap: 6, padding: '9px 18px',
-  borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', border: 'none',
-  background: primary ? '#4f46e5' : '#fff', color: primary ? '#fff' : '#374151',
-  ...(primary ? {} : { border: '1px solid #e2e8f0' }),
+  display: 'inline-flex', alignItems: 'center', gap: 6, padding: '10px 20px',
+  borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: 'pointer', border: 'none',
+  background: primary ? '#e52321' : '#fff', color: primary ? '#fff' : '#374151',
+  ...(primary ? { boxShadow: '0 4px 12px rgba(229,35,33,0.25)', textTransform: 'uppercase', letterSpacing: '0.02em' } : { border: '1px solid #e2e8f0' }),
   fontFamily: 'inherit',
 });
 
@@ -139,14 +139,14 @@ export function UploadStock() {
               onDragLeave={() => setDragOver(false)}
               onDrop={handleDrop}
               style={{
-                border: `2px dashed ${dragOver ? '#4f46e5' : '#e2e8f0'}`,
+                border: `2px dashed ${dragOver ? '#e52321' : '#e2e8f0'}`,
                 borderRadius: 12, padding: '48px 24px', textAlign: 'center',
-                cursor: 'pointer', background: dragOver ? '#eef2ff' : '#fafafa',
+                cursor: 'pointer', background: dragOver ? '#fef2f2' : '#fafafa',
                 transition: 'all 0.2s',
               }}
             >
-              <div style={{ width: 52, height: 52, borderRadius: 12, background: '#eef2ff', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
-                <UploadCloud size={24} color="#4f46e5" />
+              <div style={{ width: 52, height: 52, borderRadius: 12, background: '#fef2f2', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+                <UploadCloud size={24} color="#e52321" />
               </div>
               <h3 style={{ fontSize: 16, fontWeight: 700, color: '#0f172a', margin: '0 0 6px' }}>Click or drag & drop to upload</h3>
               <p style={{ fontSize: 13, color: '#64748b', margin: '0 0 20px' }}>Supports .xlsx, .xls, and .csv files</p>

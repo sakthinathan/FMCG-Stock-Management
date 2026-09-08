@@ -199,9 +199,9 @@ export function BrandSelection() {
           const isDone = brand.status === 'Completed';
           const isInProgress = brand.status === 'In Progress';
 
-          const cardBg = isDone ? '#eef2ff' : '#fff';
-          const cardBorder = isDone ? '#bbf7d0' : isInProgress ? '#c7d2fe' : '#e2e8f0';
-          const barColor = isDone ? '#16a34a' : isInProgress ? '#4f46e5' : '#94a3b8';
+          const cardBg = isDone ? '#f0fdf4' : '#fff';
+          const cardBorder = isDone ? '#bbf7d0' : isInProgress ? '#fecaca' : '#e2e8f0';
+          const barColor = isDone ? '#16a34a' : isInProgress ? '#e52321' : '#94a3b8';
 
           return (
             <motion.div
@@ -221,6 +221,7 @@ export function BrandSelection() {
                   gap: 16,
                   height: '100%',
                   boxSizing: 'border-box',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
                 }}
               >
                 {/* Top header inside card */}
@@ -230,21 +231,21 @@ export function BrandSelection() {
                       width: 40,
                       height: 40,
                       borderRadius: 10,
-                      background: isDone ? '#f0fdf4' : isInProgress ? '#eef2ff' : '#f8fafc',
+                      background: isDone ? '#f0fdf4' : isInProgress ? '#fef2f2' : '#f8fafc',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
                       flexShrink: 0,
                     }}
                   >
-                    <Building2 size={18} color={isDone ? '#16a34a' : isInProgress ? '#4f46e5' : '#94a3b8'} />
+                    <Building2 size={18} color={isDone ? '#16a34a' : isInProgress ? '#e52321' : '#94a3b8'} />
                   </div>
                   <StatusBadge status={brand.status} size="sm" />
                 </div>
 
                 {/* Brand name & details */}
                 <div>
-                  <h3 style={{ fontSize: 15, fontWeight: 700, color: '#0f172a', margin: '0 0 3px' }}>
+                  <h3 style={{ fontSize: 16, fontWeight: 800, color: '#0f172a', margin: '0 0 3px', textTransform: 'uppercase' }}>
                     {brand.name}
                   </h3>
                   <p style={{ fontSize: 12, color: '#64748b', margin: 0 }}>
@@ -268,20 +269,23 @@ export function BrandSelection() {
                   onClick={() => handleStart(brand.name, brand.sessionId)}
                   style={{
                     width: '100%',
-                    padding: '9px 0',
-                    borderRadius: 8,
+                    padding: '10px 0',
+                    borderRadius: 10,
                     fontSize: 13,
-                    fontWeight: 600,
+                    fontWeight: 700,
                     cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     gap: 6,
                     border: isDone ? '1px solid #e2e8f0' : 'none',
-                    background: isDone ? '#fff' : '#4f46e5',
+                    background: isDone ? '#fff' : '#e52321',
                     color: isDone ? '#475569' : '#fff',
                     boxSizing: 'border-box',
                     fontFamily: 'inherit',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.02em',
+                    boxShadow: isDone ? 'none' : '0 4px 12px rgba(229,35,33,0.25)',
                   }}
                 >
                   {brand.status === 'Not Started' ? 'Start Count' : isDone ? 'View Results' : 'Resume Count'}

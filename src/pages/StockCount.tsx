@@ -16,12 +16,12 @@ const statusStyle = (s: string) => {
 };
 
 const btn = (primary = true, disabled = false): React.CSSProperties => ({
-  display: 'inline-flex', alignItems: 'center', gap: 7, padding: '9px 18px',
-  borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: disabled ? 'not-allowed' : 'pointer',
+  display: 'inline-flex', alignItems: 'center', gap: 7, padding: '10px 20px',
+  borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: disabled ? 'not-allowed' : 'pointer',
   border: 'none', fontFamily: 'inherit',
-  background: primary ? (disabled ? '#a5b4fc' : '#4f46e5') : (disabled ? '#f8fafc' : '#fff'),
+  background: primary ? (disabled ? '#fca5a5' : '#e52321') : (disabled ? '#f8fafc' : '#fff'),
   color: primary ? '#fff' : '#374151',
-  ...(primary ? {} : { border: '1px solid #e2e8f0' }),
+  ...(primary ? { boxShadow: disabled ? 'none' : '0 4px 12px rgba(229,35,33,0.25)', textTransform: 'uppercase', letterSpacing: '0.02em' } : { border: '1px solid #e2e8f0' }),
   opacity: disabled ? 0.7 : 1,
 });
 
@@ -446,7 +446,7 @@ export function StockCount() {
                 </div>
                 <h2 style={{ fontSize: 20, fontWeight: 800, color: '#0f172a', margin: '0 0 10px', lineHeight: 1.3 }}>{currentProduct.material_desc}</h2>
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                  <span style={{ fontSize: 11, fontWeight: 700, color: '#4f46e5', fontFamily: 'monospace', background: '#eef2ff', padding: '3px 8px', borderRadius: 6 }}>SKU {currentProduct.material}</span>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: '#e52321', fontFamily: 'monospace', background: '#fef2f2', padding: '3px 8px', borderRadius: 6, border: '1px solid #fecaca' }}>SKU {currentProduct.material}</span>
                   <span style={{ fontSize: 11, fontWeight: 600, color: '#4b5563', background: '#f3f4f6', padding: '3px 8px', borderRadius: 6 }}>1 Case (CBB) = {currentProduct.conversion} PCS</span>
                 </div>
               </div>

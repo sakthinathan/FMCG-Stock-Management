@@ -88,7 +88,7 @@ export function Search() {
         {loading && (
           <Loader2
             size={16}
-            color="#4f46e5"
+            color="#e52321"
             style={{ position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)', animation: 'spin 1s linear infinite' }}
           />
         )}
@@ -131,7 +131,7 @@ export function Search() {
               <div key={item.id} style={{ ...W, padding: '18px 20px' }}>
                 {/* Top header */}
                 <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, marginBottom: 10 }}>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: '#4f46e5', fontFamily: 'monospace', background: '#eef2ff', padding: '3px 8px', borderRadius: 6 }}>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: '#e52321', fontFamily: 'monospace', background: '#fef2f2', padding: '3px 8px', borderRadius: 6, border: '1px solid #fecaca' }}>
                     {item.material}
                   </span>
                   <StatusBadge status={item.status} size="sm" />

@@ -111,15 +111,18 @@ export function Sessions() {
               display: 'flex',
               alignItems: 'center',
               gap: 6,
-              padding: '9px 18px',
-              borderRadius: 8,
+              padding: '10px 20px',
+              borderRadius: 10,
               border: 'none',
-              background: '#4f46e5',
+              background: '#e52321',
               color: '#fff',
               fontSize: 13,
-              fontWeight: 600,
+              fontWeight: 700,
               cursor: 'pointer',
               fontFamily: 'inherit',
+              textTransform: 'uppercase',
+              letterSpacing: '0.02em',
+              boxShadow: '0 4px 12px rgba(229,35,33,0.25)',
             }}
           >
             New Count <ArrowRight size={14} />
@@ -146,7 +149,7 @@ export function Sessions() {
                     <p style={{ fontSize: 11, color: '#94a3b8', margin: '2px 0 0' }}>{s.count_date}</p>
                   </td>
                   <td style={{ padding: '13px 16px' }}>
-                    <span style={{ fontSize: 11, fontWeight: 600, background: '#f1f5f9', color: '#475569', padding: '3px 8px', borderRadius: 6, border: '1px solid #e2e8f0' }}>{s.brand}</span>
+                    <span style={{ fontSize: 11, fontWeight: 600, background: '#fef2f2', color: '#e52321', padding: '3px 8px', borderRadius: 6, border: '1px solid #fecaca' }}>{s.brand}</span>
                   </td>
                   <td style={{ padding: '13px 16px', textAlign: 'center' }}>
                     <StatusBadge status={s.status} />
@@ -154,7 +157,7 @@ export function Sessions() {
                   <td style={{ padding: '13px 16px', textAlign: 'center' }}>
                     <p style={{ fontSize: 11, fontWeight: 600, color: '#64748b', margin: '0 0 4px' }}>{s.total_counted}/{s.total_products} ({s.progress}%)</p>
                     <div style={{ width: 80, height: 4, background: '#f1f5f9', borderRadius: 9999, margin: '0 auto', overflow: 'hidden' }}>
-                      <div style={{ height: '100%', width: `${s.progress}%`, background: s.progress === 100 ? '#16a34a' : '#4f46e5', borderRadius: 9999 }} />
+                      <div style={{ height: '100%', width: `${s.progress}%`, background: s.progress === 100 ? '#16a34a' : '#e52321', borderRadius: 9999 }} />
                     </div>
                   </td>
                   <td style={{ padding: '13px 16px', textAlign: 'center' }}>
@@ -162,12 +165,12 @@ export function Sessions() {
                       onClick={() => navigate(`/count/${s.id}`)}
                       style={{
                         padding: '6px 14px',
-                        borderRadius: 7,
+                        borderRadius: 8,
                         fontSize: 12,
-                        fontWeight: 600,
+                        fontWeight: 700,
                         cursor: 'pointer',
                         border: s.status === 'Completed' ? '1px solid #e2e8f0' : 'none',
-                        background: s.status === 'Completed' ? '#fff' : '#4f46e5',
+                        background: s.status === 'Completed' ? '#fff' : '#e52321',
                         color: s.status === 'Completed' ? '#475569' : '#fff',
                         fontFamily: 'inherit',
                       }}
@@ -194,13 +197,13 @@ export function Sessions() {
               <StatusBadge status={s.status} size="sm" />
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc', padding: '10px 12px', borderRadius: 8, border: '1px solid #f1f5f9' }}>
-              <span style={{ fontSize: 11, fontWeight: 600, background: '#fff', color: '#475569', padding: '2px 8px', borderRadius: 6, border: '1px solid #e2e8f0' }}>{s.brand}</span>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#fdfbf7', padding: '10px 12px', borderRadius: 8, border: '1px solid #fef2f2' }}>
+              <span style={{ fontSize: 11, fontWeight: 600, background: '#fff', color: '#e52321', padding: '2px 8px', borderRadius: 6, border: '1px solid #fecaca' }}>{s.brand}</span>
               <span style={{ fontSize: 12, fontWeight: 700, color: '#334155' }}>{s.total_counted} / {s.total_products} ({s.progress}%)</span>
             </div>
 
             <div style={{ height: 5, background: '#f1f5f9', borderRadius: 9999, overflow: 'hidden' }}>
-              <div style={{ height: '100%', width: `${s.progress}%`, background: s.progress === 100 ? '#16a34a' : '#4f46e5', borderRadius: 9999 }} />
+              <div style={{ height: '100%', width: `${s.progress}%`, background: s.progress === 100 ? '#16a34a' : '#e52321', borderRadius: 9999 }} />
             </div>
 
             <button
@@ -210,10 +213,10 @@ export function Sessions() {
                 padding: '9px 0',
                 borderRadius: 8,
                 fontSize: 13,
-                fontWeight: 600,
+                fontWeight: 700,
                 cursor: 'pointer',
                 border: s.status === 'Completed' ? '1px solid #e2e8f0' : 'none',
-                background: s.status === 'Completed' ? '#fff' : '#4f46e5',
+                background: s.status === 'Completed' ? '#fff' : '#e52321',
                 color: s.status === 'Completed' ? '#475569' : '#fff',
                 fontFamily: 'inherit',
               }}

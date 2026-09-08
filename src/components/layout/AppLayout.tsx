@@ -130,15 +130,15 @@ export function AppLayout() {
                     key={to} to={to}
                     style={{
                       display: 'flex', alignItems: 'center', gap: 9, padding: '8px 10px',
-                      borderRadius: 8, textDecoration: 'none', fontSize: 13, fontWeight: active ? 600 : 500,
-                      color: active ? '#4f46e5' : '#475569',
-                      background: active ? '#eef2ff' : 'transparent',
+                      borderRadius: 8, textDecoration: 'none', fontSize: 13, fontWeight: active ? 700 : 500,
+                      color: active ? '#e52321' : '#475569',
+                      background: active ? '#fef2f2' : 'transparent',
                       marginBottom: 1,
                     }}
-                    onMouseEnter={e => { if (!active) (e.currentTarget as HTMLElement).style.background = '#f8fafc'; }}
+                    onMouseEnter={e => { if (!active) (e.currentTarget as HTMLElement).style.background = '#fdfbf7'; }}
                     onMouseLeave={e => { if (!active) (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
                   >
-                    <Icon size={15} color={active ? '#4f46e5' : '#94a3b8'} style={{ flexShrink: 0 }} />
+                    <Icon size={15} color={active ? '#e52321' : '#94a3b8'} style={{ flexShrink: 0 }} />
                     {label}
                   </NavLink>
                 );
@@ -149,8 +149,8 @@ export function AppLayout() {
 
         {/* User */}
         <div style={{ borderTop: '1px solid #f1f5f9', padding: '12px 12px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '8px 10px', borderRadius: 8, background: '#f8fafc', marginBottom: 6 }}>
-            <div style={{ width: 30, height: 30, borderRadius: '50%', background: 'linear-gradient(135deg, #4f46e5, #7c3aed)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: 12, flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '8px 10px', borderRadius: 8, background: '#fdfbf7', marginBottom: 6, border: '1px solid #fef2f2' }}>
+            <div style={{ width: 30, height: 30, borderRadius: '50%', background: 'linear-gradient(135deg, #e52321, #991b1b)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: 12, flexShrink: 0 }}>
               {user?.email?.[0]?.toUpperCase() || 'A'}
             </div>
             <div style={{ minWidth: 0 }}>
@@ -194,8 +194,8 @@ export function AppLayout() {
                     const active = isActive(location.pathname, to);
                     return (
                       <NavLink key={to} to={to} onClick={() => setMobileMenuOpen(false)}
-                        style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '9px 10px', borderRadius: 8, textDecoration: 'none', fontSize: 14, fontWeight: active ? 600 : 500, color: active ? '#4f46e5' : '#475569', background: active ? '#eef2ff' : 'transparent', marginBottom: 1 }}>
-                        <Icon size={16} color={active ? '#4f46e5' : '#94a3b8'} />
+                        style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '9px 10px', borderRadius: 8, textDecoration: 'none', fontSize: 14, fontWeight: active ? 700 : 500, color: active ? '#e52321' : '#475569', background: active ? '#fef2f2' : 'transparent', marginBottom: 1 }}>
+                        <Icon size={16} color={active ? '#e52321' : '#94a3b8'} />
                         {label}
                       </NavLink>
                     );
@@ -211,7 +211,7 @@ export function AppLayout() {
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, overflow: 'hidden' }}>
 
         {/* Dark Top Bar */}
-        <header style={{ height: 56, background: '#0f172a', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 24px', flexShrink: 0, gap: 16 }}>
+        <header style={{ height: 56, background: '#0f172a', borderBottom: '2px solid #e52321', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 24px', flexShrink: 0, gap: 16 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             {/* Mobile hamburger */}
             <button onClick={() => setMobileMenuOpen(true)} style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#94a3b8', display: 'flex', padding: 4 }} className="mobile-menu-btn">
@@ -231,7 +231,7 @@ export function AppLayout() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             {filename && (
               <span style={{
-                fontSize: 10, background: '#1e293b', color: '#38bdf8', border: '1px solid #334155',
+                fontSize: 10, background: '#1e293b', color: '#f59e0b', border: '1px solid #334155',
                 padding: '4px 8px', borderRadius: 6, maxWidth: 160, overflow: 'hidden',
                 textOverflow: 'ellipsis', whiteSpace: 'nowrap'
               }} className="filename-badge">
@@ -244,7 +244,7 @@ export function AppLayout() {
               background: '#1e293b', border: '1px solid #334155', borderRadius: 8,
               padding: '4px 10px', flexShrink: 0
             }} className="live-clock">
-              <span style={{ fontSize: 11, fontWeight: 700, color: '#38bdf8', fontFamily: 'monospace' }}>
+              <span style={{ fontSize: 11, fontWeight: 700, color: '#f59e0b', fontFamily: 'monospace' }}>
                 {time.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}
               </span>
               <span style={{ fontSize: 9, color: '#94a3b8', fontWeight: 600 }}>
@@ -267,7 +267,7 @@ export function AppLayout() {
                   <p style={{ fontSize: 12, fontWeight: 600, color: '#f1f5f9', margin: 0 }}>{user?.email?.split('@')[0] || 'Admin'}</p>
                   <p style={{ fontSize: 10, color: '#94a3b8', margin: 0 }}>{profile?.role || 'Administrator'}</p>
                 </div>
-                <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'linear-gradient(135deg, #4f46e5, #7c3aed)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: 13, flexShrink: 0 }}>
+                <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'linear-gradient(135deg, #e52321, #991b1b)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: 13, flexShrink: 0 }}>
                   {user?.email?.[0]?.toUpperCase() || 'A'}
                 </div>
                 <ChevronDown size={14} color="#94a3b8" style={{ transform: userMenuOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }} />
@@ -283,10 +283,10 @@ export function AppLayout() {
                   <div style={{ padding: '10px 12px 10px', borderBottom: '1px solid #f1f5f9' }}>
                     <p style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', margin: '0 0 2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user?.email || 'admin@thulir.com'}</p>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
-                      <span style={{ fontSize: 10, fontWeight: 600, background: '#eef2ff', color: '#4f46e5', padding: '2px 6px', borderRadius: 4 }}>{profile?.role || 'Administrator'}</span>
+                      <span style={{ fontSize: 10, fontWeight: 600, background: '#fef2f2', color: '#e52321', padding: '2px 6px', borderRadius: 4 }}>{profile?.role || 'Administrator'}</span>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#f8fafc', padding: '6px 8px', borderRadius: 6, border: '1px solid #f1f5f9' }}>
-                      <Building size={13} color="#4f46e5" style={{ flexShrink: 0 }} />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#fdfbf7', padding: '6px 8px', borderRadius: 6, border: '1px solid #fef2f2' }}>
+                      <Building size={13} color="#e52321" style={{ flexShrink: 0 }} />
                       <span style={{ fontSize: 11, fontWeight: 700, color: '#1e293b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{agency?.name || 'THULIR AGENCY'}</span>
                     </div>
                   </div>
@@ -295,10 +295,10 @@ export function AppLayout() {
                     <button
                       onClick={() => { setUserMenuOpen(false); navigate('/settings'); }}
                       style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 9, padding: '8px 10px', border: 'none', background: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, color: '#334155', fontWeight: 500, fontFamily: 'inherit' }}
-                      onMouseEnter={e => (e.currentTarget.style.background = '#f8fafc')}
+                      onMouseEnter={e => (e.currentTarget.style.background = '#fdfbf7')}
                       onMouseLeave={e => (e.currentTarget.style.background = 'none')}
                     >
-                      <Building size={15} color="#64748b" style={{ flexShrink: 0 }} />
+                      <Building size={15} color="#e52321" style={{ flexShrink: 0 }} />
                       <div style={{ textAlign: 'left', minWidth: 0, flex: 1 }}>
                         <p style={{ margin: 0, fontWeight: 600, fontSize: 13, color: '#0f172a' }}>Agency Profile</p>
                         <p style={{ margin: 0, fontSize: 10, color: '#64748b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{agency?.name || 'THULIR AGENCY'}</p>
@@ -307,7 +307,7 @@ export function AppLayout() {
                     <button
                       onClick={() => { setUserMenuOpen(false); navigate('/settings'); }}
                       style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 9, padding: '8px 10px', border: 'none', background: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, color: '#334155', fontWeight: 500, fontFamily: 'inherit' }}
-                      onMouseEnter={e => (e.currentTarget.style.background = '#f8fafc')}
+                      onMouseEnter={e => (e.currentTarget.style.background = '#fdfbf7')}
                       onMouseLeave={e => (e.currentTarget.style.background = 'none')}
                     >
                       <Settings size={15} color="#64748b" style={{ flexShrink: 0 }} />
@@ -332,7 +332,7 @@ export function AppLayout() {
         </header>
 
         {/* Page content */}
-        <main style={{ flex: 1, overflowY: 'auto', background: '#f1f5f9' }}>
+        <main style={{ flex: 1, overflowY: 'auto', background: '#fdfbf7' }}>
           <div style={{ maxWidth: 1200, margin: '0 auto', padding: '28px 28px 80px' }} className="main-content">
             <AnimatePresence mode="wait">
               <motion.div
@@ -354,8 +354,8 @@ export function AppLayout() {
             const active = isActive(location.pathname, to);
             return (
               <NavLink key={to} to={to}
-                style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, padding: '4px 10px', textDecoration: 'none', color: active ? '#4f46e5' : '#94a3b8', fontSize: 10, fontWeight: 500 }}>
-                <Icon size={20} color={active ? '#4f46e5' : '#94a3b8'} />
+                style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, padding: '4px 10px', textDecoration: 'none', color: active ? '#e52321' : '#94a3b8', fontSize: 10, fontWeight: 500 }}>
+                <Icon size={20} color={active ? '#e52321' : '#94a3b8'} />
                 {label}
               </NavLink>
             );

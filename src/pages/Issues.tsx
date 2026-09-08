@@ -262,7 +262,7 @@ export function Issues() {
                       onClick={() => handleRecount(issue.id)}
                       style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 7, border: '1px solid #e2e8f0', background: '#fff', color: '#475569', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}
                     >
-                      <RotateCcw size={12} color="#4f46e5" /> Recount
+                      <RotateCcw size={12} color="#e52321" /> Recount
                     </button>
                   </div>
                 </div>

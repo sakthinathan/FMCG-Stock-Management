@@ -351,18 +351,21 @@ export function Reports() {
             onClick={handleDownloadPdf}
             disabled={downloadingType === 'pdf'}
             style={{
-              padding: '9px 18px',
-              borderRadius: 8,
+              padding: '10px 20px',
+              borderRadius: 10,
               border: 'none',
-              background: '#4f46e5',
+              background: '#e52321',
               color: '#fff',
               fontSize: 13,
-              fontWeight: 600,
+              fontWeight: 700,
               cursor: downloadingType === 'pdf' ? 'not-allowed' : 'pointer',
               fontFamily: 'inherit',
               display: 'flex',
               alignItems: 'center',
               gap: 6,
+              textTransform: 'uppercase',
+              letterSpacing: '0.02em',
+              boxShadow: '0 4px 12px rgba(229,35,33,0.25)',
             }}
           >
             <Download size={15} /> Print Full PDF Report
