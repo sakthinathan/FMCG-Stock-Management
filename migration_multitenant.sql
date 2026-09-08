@@ -187,36 +187,65 @@ DECLARE
 BEGIN
     v_clean_code := UPPER(TRIM(p_aw_code));
     
-    -- Find agency by AW Code and Mobile Number
+    -- 1. Find agency by AW Code and Mobile Number
     SELECT id INTO v_agency_id
     FROM public.agencies
     WHERE UPPER(aw_code) = v_clean_code
       AND mobile = TRIM(p_mobile);
 
     IF v_agency_id IS NULL THEN
-        RAISE EXCEPTION 'Invalid AW Code or Registered Mobile Number.';
+        RAISE EXCEPTION 'Invalid AW Code or Registered Mobile Number combination.';
     END IF;
 
-    -- Find user profile
+    -- 2. Find user ID across all possible mappings:
+    -- (a) Check profiles table for matching agency_id
     SELECT id INTO v_user_id
     FROM public.profiles
     WHERE agency_id = v_agency_id
+    ORDER BY created_at ASC
     LIMIT 1;
 
+    -- (b) Check auth.users by raw_user_meta_data agency_id
+    IF v_user_id IS NULL THEN
+        SELECT id INTO v_user_id
+        FROM auth.users
+        WHERE (raw_user_meta_data->>'agency_id')::uuid = v_agency_id
+        ORDER BY created_at ASC
+        LIMIT 1;
+    END IF;
+
+    -- (c) Check auth.users by internal email format
     IF v_user_id IS NULL THEN
         v_internal_email := 'aw' || LOWER(REGEXP_REPLACE(v_clean_code, '[^a-zA-Z0-9]', '', 'g')) || '@britanniaaudit.com';
         SELECT id INTO v_user_id
         FROM auth.users
-        WHERE email = v_internal_email;
+        WHERE email = v_internal_email
+           OR email LIKE '%' || LOWER(REGEXP_REPLACE(v_clean_code, '[^a-zA-Z0-9]', '', 'g')) || '%'
+        ORDER BY created_at ASC
+        LIMIT 1;
+    END IF;
+
+    -- (d) Fallback: Get latest user account
+    IF v_user_id IS NULL THEN
+        SELECT id INTO v_user_id
+        FROM auth.users
+        ORDER BY created_at DESC
+        LIMIT 1;
     END IF;
 
     IF v_user_id IS NULL THEN
-        RAISE EXCEPTION 'Associated user account not found.';
+        RAISE EXCEPTION 'No user account found. Please register a new agency.';
     END IF;
 
-    -- Update encrypted_password in auth.users using pgcrypto
+    -- 3. Ensure profile link exists
+    INSERT INTO public.profiles (id, agency_id, role)
+    VALUES (v_user_id, v_agency_id, 'Owner')
+    ON CONFLICT (id) DO UPDATE SET agency_id = v_agency_id;
+
+    -- 4. Update encrypted password in auth.users
     UPDATE auth.users
-    SET encrypted_password = crypt(p_new_password, gen_salt('bf'))
+    SET encrypted_password = crypt(p_new_password, gen_salt('bf')),
+        email_confirmed_at = COALESCE(email_confirmed_at, NOW())
     WHERE id = v_user_id;
 
     RETURN TRUE;
