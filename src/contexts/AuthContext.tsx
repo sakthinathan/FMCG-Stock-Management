@@ -11,6 +11,9 @@ interface Profile {
 interface Agency {
   id: string;
   name: string;
+  aw_code?: string | null;
+  district?: string | null;
+  mobile?: string | null;
   logo_url: string | null;
 }
 

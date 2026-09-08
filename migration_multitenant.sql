@@ -2,9 +2,17 @@
 CREATE TABLE IF NOT EXISTS agencies (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name TEXT NOT NULL,
+    aw_code TEXT UNIQUE,
+    district TEXT,
+    mobile TEXT,
     logo_url TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Add new columns if table already existed
+ALTER TABLE agencies ADD COLUMN IF NOT EXISTS aw_code TEXT UNIQUE;
+ALTER TABLE agencies ADD COLUMN IF NOT EXISTS district TEXT;
+ALTER TABLE agencies ADD COLUMN IF NOT EXISTS mobile TEXT;
 
 -- 2. Create profiles table
 CREATE TABLE IF NOT EXISTS profiles (
@@ -23,8 +31,8 @@ ALTER TABLE agencies ENABLE ROW LEVEL SECURITY;
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
 
 -- 5. Create default agency so existing data is not orphaned
-INSERT INTO agencies (id, name)
-VALUES ('00000000-0000-0000-0000-000000000001', 'Thulir Agency')
+INSERT INTO agencies (id, name, aw_code, district, mobile)
+VALUES ('00000000-0000-0000-0000-000000000001', 'Thulir Agency', 'AW0001', 'Chennai', '9876543210')
 ON CONFLICT (id) DO NOTHING;
 
 -- Map any existing uploads & sessions to default Thulir Agency
@@ -54,30 +62,25 @@ $$;
 
 -- Drop any conflicting policies
 DROP POLICY IF EXISTS "Allow users to read their own agency" ON agencies;
+DROP POLICY IF EXISTS "Allow public lookup of agency by aw_code" ON agencies;
 DROP POLICY IF EXISTS "Allow authenticated users to create agencies" ON agencies;
 DROP POLICY IF EXISTS "Allow anyone to create agencies" ON agencies;
-DROP POLICY IF EXISTS "Allow users to read profiles in same agency" ON profiles;
-DROP POLICY IF EXISTS "Allow users to manage own profile" ON profiles;
-DROP POLICY IF EXISTS "Allow users to select profiles in same agency" ON profiles;
-DROP POLICY IF EXISTS "Allow users to write own profile" ON profiles;
-DROP POLICY IF EXISTS "Allow tenant all on stock_uploads" ON stock_uploads;
-DROP POLICY IF EXISTS "Allow tenant all on stock_count_sessions" ON stock_count_sessions;
-DROP POLICY IF EXISTS "Allow tenant read on system_stock_snapshots" ON system_stock_snapshots;
-DROP POLICY IF EXISTS "Allow tenant all on physical_stock_counts" ON physical_stock_counts;
-DROP POLICY IF EXISTS "Allow public all on stock_uploads" ON stock_uploads;
-DROP POLICY IF EXISTS "Allow public all on stock_count_sessions" ON stock_count_sessions;
-DROP POLICY IF EXISTS "Allow public all on system_stock_snapshots" ON system_stock_snapshots;
-DROP POLICY IF EXISTS "Allow public all on physical_stock_counts" ON physical_stock_counts;
 
--- Setup clean policies using helper:
+-- Agencies Policies: Allow anyone (anon + auth) to read/lookup agencies by aw_code for login verification
+CREATE POLICY "Allow public lookup of agency by aw_code" ON agencies
+    FOR SELECT TO anon, authenticated USING (true);
 
--- Agencies Policies
-DROP POLICY IF EXISTS "Allow anyone to create agencies" ON agencies;
 CREATE POLICY "Allow anyone to create agencies" ON agencies
     FOR INSERT TO anon, authenticated WITH CHECK (true);
 
 -- RPC Function to safely insert new agencies during registration
-CREATE OR REPLACE FUNCTION public.create_agency(agency_name TEXT, logo_url TEXT DEFAULT NULL)
+CREATE OR REPLACE FUNCTION public.create_agency(
+    p_agency_name TEXT,
+    p_aw_code TEXT,
+    p_district TEXT DEFAULT NULL,
+    p_mobile TEXT DEFAULT NULL,
+    p_logo_url TEXT DEFAULT NULL
+)
 RETURNS UUID
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -86,15 +89,15 @@ AS $$
 DECLARE
     new_agency_id UUID;
 BEGIN
-    INSERT INTO public.agencies (name, logo_url)
-    VALUES (agency_name, logo_url)
+    INSERT INTO public.agencies (name, aw_code, district, mobile, logo_url)
+    VALUES (p_agency_name, UPPER(p_aw_code), p_district, p_mobile, p_logo_url)
     RETURNING id INTO new_agency_id;
 
     RETURN new_agency_id;
 END;
 $$;
 
-GRANT EXECUTE ON FUNCTION public.create_agency(TEXT, TEXT) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.create_agency(TEXT, TEXT, TEXT, TEXT, TEXT) TO anon, authenticated;
 
 -- Profiles Policies
 CREATE POLICY "Allow users to select profiles in same agency" ON profiles
