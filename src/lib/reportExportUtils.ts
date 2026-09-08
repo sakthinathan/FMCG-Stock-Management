@@ -32,7 +32,7 @@ export function exportReportToPdf(
     shortageValue: number;
     excessValue: number;
   },
-  agencyName = 'THULIR AGENCY'
+  agencyName = 'FMCG DISTRIBUTOR'
 ) {
   if (!rows || rows.length === 0) return false;
 
