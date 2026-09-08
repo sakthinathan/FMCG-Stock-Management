@@ -84,8 +84,9 @@ export function Signup() {
         agencyId = agencyData.id;
       }
 
-      // 3. Construct internal email identifier for auth: e.g. aw100234@agency.local
-      const internalEmail = `${cleanAwCode.toLowerCase()}@agency.local`;
+      // 3. Construct clean internal email identifier for auth: e.g. aw25999@britanniaaudit.com
+      const safeCode = cleanAwCode.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+      const internalEmail = `aw${safeCode}@britanniaaudit.com`;
 
       // 4. Register user in Supabase Auth
       const { data: authData, error: authError } = await supabase.auth.signUp({

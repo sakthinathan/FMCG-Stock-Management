@@ -75,8 +75,9 @@ export function Login() {
     setLoading(true);
     setError(null);
     try {
-      // Internal email format: awcode@agency.local
-      const internalEmail = `${cleanAwCode.toLowerCase()}@agency.local`;
+      // Internal email format: aw25999@britanniaaudit.com
+      const safeCode = cleanAwCode.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+      const internalEmail = `aw${safeCode}@britanniaaudit.com`;
       const { error } = await supabase.auth.signInWithPassword({
         email: internalEmail,
         password

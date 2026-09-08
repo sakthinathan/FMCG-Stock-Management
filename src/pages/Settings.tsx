@@ -12,7 +12,7 @@ const W: React.CSSProperties = { background: '#fff', borderRadius: 12, boxShadow
 
 export function Settings() {
   const { theme, setTheme } = useTheme();
-  const { user } = useAuth();
+  const { user, agency } = useAuth();
   const { clearActiveUpload } = useStockStore();
   const navigate = useNavigate();
   const [isClearing, setIsClearing] = useState(false);
@@ -121,22 +121,28 @@ export function Settings() {
               <User size={16} color="#16a34a" />
             </div>
             <div>
-              <h2 style={{ fontSize: 14, fontWeight: 700, color: '#0f172a', margin: 0 }}>Account Details</h2>
-              <p style={{ fontSize: 12, color: '#64748b', margin: '1px 0 0' }}>Your current login session</p>
+              <h2 style={{ fontSize: 14, fontWeight: 700, color: '#0f172a', margin: 0 }}>Distributor Account</h2>
+              <p style={{ fontSize: 12, color: '#64748b', margin: '1px 0 0' }}>Agency credentials & session info</p>
             </div>
           </div>
           <div style={{ padding: '18px 22px', display: 'flex', flexDirection: 'column', gap: 14 }}>
             <div>
-              <p style={{ fontSize: 11, fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 4px' }}>Email Address</p>
-              <p style={{ fontSize: 14, fontWeight: 600, color: '#0f172a', margin: 0 }}>{user?.email}</p>
+              <p style={{ fontSize: 11, fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 4px' }}>AW Code</p>
+              <p style={{ fontSize: 15, fontWeight: 800, color: '#e52321', margin: 0, fontFamily: 'monospace' }}>{agency?.aw_code || 'AW0001'}</p>
             </div>
             <div>
-              <p style={{ fontSize: 11, fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 4px' }}>Account ID</p>
-              <p style={{ fontSize: 11, color: '#64748b', fontFamily: 'monospace', margin: 0, wordBreak: 'break-all' }}>{user?.id}</p>
+              <p style={{ fontSize: 11, fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 4px' }}>Agency Name & Location</p>
+              <p style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', margin: 0 }}>{agency?.name || 'Thulir Agency'}{agency?.district ? ` (${agency.district})` : ''}</p>
             </div>
+            {agency?.mobile && (
+              <div>
+                <p style={{ fontSize: 11, fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 4px' }}>Mobile Number</p>
+                <p style={{ fontSize: 13, fontWeight: 600, color: '#334155', margin: 0 }}>+91 {agency.mobile}</p>
+              </div>
+            )}
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 12px', background: '#f0fdf4', borderRadius: 8, border: '1px solid #bbf7d0' }}>
               <Shield size={13} color="#16a34a" />
-              <span style={{ fontSize: 12, fontWeight: 600, color: '#16a34a' }}>Authenticated via Supabase</span>
+              <span style={{ fontSize: 12, fontWeight: 600, color: '#16a34a' }}>Authenticated Distributor Session</span>
             </div>
           </div>
         </div>

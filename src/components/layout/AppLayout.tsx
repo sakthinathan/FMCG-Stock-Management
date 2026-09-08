@@ -151,12 +151,12 @@ export function AppLayout() {
         <div style={{ borderTop: '1px solid #f1f5f9', padding: '12px 12px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '8px 10px', borderRadius: 8, background: '#fdfbf7', marginBottom: 6, border: '1px solid #fef2f2' }}>
             <div style={{ width: 30, height: 30, borderRadius: '50%', background: 'linear-gradient(135deg, #e52321, #991b1b)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: 12, flexShrink: 0 }}>
-              {user?.email?.[0]?.toUpperCase() || 'A'}
+              {agency?.name?.[0]?.toUpperCase() || 'A'}
             </div>
             <div style={{ minWidth: 0 }}>
-              <p style={{ fontSize: 12, fontWeight: 600, color: '#1e293b', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user?.email || 'Admin'}</p>
-              <p style={{ fontSize: 10, color: '#10b981', margin: '1px 0 0', display: 'flex', alignItems: 'center', gap: 4, fontWeight: 500 }}>
-                <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#10b981', display: 'inline-block' }} />Active
+              <p style={{ fontSize: 12, fontWeight: 700, color: '#1e293b', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{agency?.name || 'Thulir Agency'}</p>
+              <p style={{ fontSize: 10, color: '#e52321', margin: '1px 0 0', fontWeight: 700 }}>
+                {agency?.aw_code ? `AW Code: ${agency.aw_code}` : 'Distributor'}
               </p>
             </div>
           </div>
@@ -264,11 +264,11 @@ export function AppLayout() {
                 onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
               >
                 <div style={{ textAlign: 'right' }} className="user-text">
-                  <p style={{ fontSize: 12, fontWeight: 600, color: '#f1f5f9', margin: 0 }}>{user?.email?.split('@')[0] || 'Admin'}</p>
-                  <p style={{ fontSize: 10, color: '#94a3b8', margin: 0 }}>{profile?.role || 'Administrator'}</p>
+                  <p style={{ fontSize: 12, fontWeight: 700, color: '#f1f5f9', margin: 0 }}>{agency?.name || 'Distributor'}</p>
+                  <p style={{ fontSize: 10, color: '#f59e0b', margin: 0, fontWeight: 700 }}>{agency?.aw_code ? `AW: ${agency.aw_code}` : profile?.role || 'Owner'}</p>
                 </div>
                 <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'linear-gradient(135deg, #e52321, #991b1b)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: 13, flexShrink: 0 }}>
-                  {user?.email?.[0]?.toUpperCase() || 'A'}
+                  {agency?.name?.[0]?.toUpperCase() || 'A'}
                 </div>
                 <ChevronDown size={14} color="#94a3b8" style={{ transform: userMenuOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }} />
               </button>
@@ -281,13 +281,15 @@ export function AppLayout() {
                   border: '1px solid #e2e8f0', zIndex: 60, padding: '6px'
                 }}>
                   <div style={{ padding: '10px 12px 10px', borderBottom: '1px solid #f1f5f9' }}>
-                    <p style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', margin: '0 0 2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user?.email || 'admin@thulir.com'}</p>
+                    <p style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', margin: '0 0 2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{agency?.name || 'Distributor Agency'}</p>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
-                      <span style={{ fontSize: 10, fontWeight: 600, background: '#fef2f2', color: '#e52321', padding: '2px 6px', borderRadius: 4 }}>{profile?.role || 'Administrator'}</span>
+                      <span style={{ fontSize: 10, fontWeight: 800, background: '#fef2f2', color: '#e52321', padding: '2px 6px', borderRadius: 4 }}>
+                        {agency?.aw_code ? `AW CODE: ${agency.aw_code}` : 'OWNER'}
+                      </span>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#fdfbf7', padding: '6px 8px', borderRadius: 6, border: '1px solid #fef2f2' }}>
                       <Building size={13} color="#e52321" style={{ flexShrink: 0 }} />
-                      <span style={{ fontSize: 11, fontWeight: 700, color: '#1e293b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{agency?.name || 'THULIR AGENCY'}</span>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: '#1e293b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{agency?.district ? `${agency.district} District` : agency?.name}</span>
                     </div>
                   </div>
 
