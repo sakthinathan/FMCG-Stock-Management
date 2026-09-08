@@ -33,6 +33,20 @@ export function UploadStock() {
 
   useEffect(() => { fetchHistory(); }, []);
 
+  const formatStockFileName = (originalName: string): string => {
+    const now = new Date();
+    const day = String(now.getDate()).padStart(2, '0');
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const year = now.getFullYear();
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    const seconds = String(now.getSeconds()).padStart(2, '0');
+
+    const extMatch = originalName.match(/\.(xlsx|xls|csv)$/i);
+    const ext = extMatch ? extMatch[0] : '.xlsx';
+    return `Stock_MRP_${day}_${month}_${year}_${hours}_${minutes}_${seconds}${ext}`;
+  };
+
   const processFile = async (file: File) => {
     setIsUploading(true);
     setError(null);
@@ -44,8 +58,10 @@ export function UploadStock() {
         return;
       }
 
+      const formattedFileName = formatStockFileName(file.name);
+
       const { data: uploadData, error: uploadError } = await supabase.from('stock_uploads')
-        .insert({ file_name: file.name, total_records: result.products.length, agency_id: profile?.agency_id }).select().single();
+        .insert({ file_name: formattedFileName, total_records: result.products.length, agency_id: profile?.agency_id }).select().single();
       if (uploadError) throw uploadError;
 
       const prevVariances = new Map();
@@ -83,7 +99,7 @@ export function UploadStock() {
       }
 
       setParseResult(result);
-      setActiveUpload(uploadData.id, file.name, uploadData.uploaded_at);
+      setActiveUpload(uploadData.id, formattedFileName, uploadData.uploaded_at);
       fetchHistory();
     } catch (err: any) {
       setError(err.message || 'Failed to process file.');
