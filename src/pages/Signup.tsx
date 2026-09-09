@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
-import { Loader2, Building, MapPin, Phone, Hash, Lock, CheckCircle2 } from 'lucide-react';
+import { Loader2, Building, MapPin, Phone, Hash, Lock, CheckCircle2, ArrowRight, Sparkles } from 'lucide-react';
 
 export function Signup() {
   const navigate = useNavigate();
@@ -13,6 +13,14 @@ export function Signup() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Success Modal State
+  const [createdAgencyModalInfo, setCreatedAgencyModalInfo] = useState<{
+    awCode: string;
+    agencyName: string;
+    district: string;
+    mobile: string;
+  } | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -108,8 +116,13 @@ export function Signup() {
       }
       if (!authData.user) throw new Error('User registration failed.');
 
-      alert(`Agency "${agencyName}" registered successfully with AW Code: ${cleanAwCode}`);
-      navigate('/login', { state: { registeredAwCode: cleanAwCode } });
+      // Show Web App Success Modal instead of browser alert
+      setCreatedAgencyModalInfo({
+        awCode: cleanAwCode,
+        agencyName: agencyName.trim(),
+        district: district.trim(),
+        mobile: mobile.trim()
+      });
     } catch (err: any) {
       setError(err.message || 'Failed to register agency.');
     } finally {
@@ -236,6 +249,88 @@ export function Signup() {
           Already registered? <Link to="/login" style={{ color: '#e52321', fontWeight: 700, textDecoration: 'none' }}>Login with AW Code</Link>
         </div>
       </div>
+
+      {/* Web App Registration Success Modal */}
+      {createdAgencyModalInfo && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+          {/* Backdrop */}
+          <div style={{ position: 'absolute', inset: 0, background: 'rgba(15, 23, 42, 0.75)', backdropFilter: 'blur(6px)' }} />
+
+          {/* Modal Content */}
+          <div style={{
+            position: 'relative', width: '100%', maxWidth: 420, background: '#ffffff',
+            borderRadius: 24, padding: '32px 28px',
+            boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.4)',
+            border: '2px solid #bbf7d0', zIndex: 101, textAlign: 'center',
+            boxSizing: 'border-box'
+          }}>
+            {/* Animated Big Green Check Halo */}
+            <div style={{
+              width: 72, height: 72, borderRadius: '50%', background: '#f0fdf4',
+              border: '2px solid #bbf7d0', color: '#16a34a',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              margin: '0 auto 18px', boxShadow: '0 10px 25px rgba(22, 163, 74, 0.25)'
+            }}>
+              <CheckCircle2 size={44} color="#16a34a" />
+            </div>
+
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '4px 12px', borderRadius: 9999, color: '#16a34a', fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>
+              <Sparkles size={12} /> Congratulations!
+            </div>
+
+            <h2 style={{ fontSize: 22, fontWeight: 800, color: '#0f172a', margin: '0 0 6px', textTransform: 'uppercase' }}>
+              Agency Registered Successfully
+            </h2>
+            <p style={{ fontSize: 13, color: '#64748b', margin: '0 0 20px' }}>
+              Your distributor account has been created and is ready for stock auditing.
+            </p>
+
+            {/* Created Agency Summary Card */}
+            <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 16, padding: '16px 18px', textAlign: 'left', display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 22 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: 8 }}>
+                <span style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>AW CODE</span>
+                <span style={{ fontSize: 16, fontWeight: 800, background: '#e52321', color: '#fff', padding: '3px 12px', borderRadius: 9999, fontFamily: 'monospace', letterSpacing: '0.06em' }}>
+                  {createdAgencyModalInfo.awCode}
+                </span>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: 12, color: '#64748b', fontWeight: 600 }}>Agency Name</span>
+                <span style={{ fontSize: 13, color: '#0f172a', fontWeight: 800 }}>{createdAgencyModalInfo.agencyName}</span>
+              </div>
+
+              {createdAgencyModalInfo.district && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: 12, color: '#64748b', fontWeight: 600 }}>District / City</span>
+                  <span style={{ fontSize: 13, color: '#334155', fontWeight: 700 }}>{createdAgencyModalInfo.district}</span>
+                </div>
+              )}
+
+              {createdAgencyModalInfo.mobile && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: 12, color: '#64748b', fontWeight: 600 }}>Mobile Number</span>
+                  <span style={{ fontSize: 13, color: '#334155', fontWeight: 700 }}>+91 {createdAgencyModalInfo.mobile}</span>
+                </div>
+              )}
+            </div>
+
+            {/* Action Button */}
+            <button
+              onClick={() => navigate('/login', { state: { registeredAwCode: createdAgencyModalInfo.awCode } })}
+              style={{
+                width: '100%', height: 48, background: '#e52321', border: 'none',
+                borderRadius: 12, color: '#fff', fontSize: 14, fontWeight: 800,
+                cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                gap: 8, fontFamily: 'inherit', textTransform: 'uppercase', letterSpacing: '0.04em',
+                boxShadow: '0 4px 14px rgba(229, 35, 33, 0.35)'
+              }}
+            >
+              Proceed to Login <ArrowRight size={16} />
+            </button>
+          </div>
+        </div>
+      )}
+
       <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
     </div>
   );
