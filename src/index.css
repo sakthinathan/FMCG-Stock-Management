@@ -43,11 +43,11 @@
   --popover-foreground: #f8fafc;
   --primary: #e52321;
   --primary-foreground: #ffffff;
-  --secondary: #151e2e;
+  --secondary: #1a2436;
   --secondary-foreground: #cbd5e1;
-  --muted: #151e2e;
+  --muted: #1a2436;
   --muted-foreground: #94a3b8;
-  --accent: #151e2e;
+  --accent: #1a2436;
   --accent-foreground: #cbd5e1;
   --destructive: #ef4444;
   --destructive-foreground: #ffffff;
@@ -57,7 +57,9 @@
 }
 
 /* Global overrides for dark mode inline styles */
-.dark body {
+.dark body,
+.dark main,
+.dark .main-content {
   background-color: var(--background) !important;
   color: var(--foreground) !important;
 }
@@ -65,52 +67,117 @@
 .dark aside,
 .dark .desktop-sidebar,
 .dark .skus-list-panel,
-.dark .stock-count-layout div[style*="background: #fff"] {
+.dark footer {
   background-color: var(--card) !important;
   border-color: var(--border) !important;
 }
 
+/* Card & White/Cream Background Overrides */
 .dark [style*="background: #fff"],
+.dark [style*="background:#fff"],
 .dark [style*="background: #ffffff"],
+.dark [style*="background:#ffffff"],
 .dark [style*="background: rgb(255, 255, 255)"],
 .dark [style*="background-color: #fff"],
-.dark [style*="background-color: #ffffff"] {
+.dark [style*="background-color: #ffffff"],
+.dark [style*="background: #fdfbf7"],
+.dark [style*="background:#fdfbf7"],
+.dark [style*="background: rgb(253, 251, 247)"],
+.dark [style*="background-color: #fdfbf7"] {
   background-color: var(--card) !important;
   color: var(--foreground) !important;
 }
 
+/* Muted & Secondary Section Overrides */
 .dark [style*="background: #f8fafc"],
+.dark [style*="background:#f8fafc"],
 .dark [style*="background: #f1f5f9"],
+.dark [style*="background:#f1f5f9"],
+.dark [style*="background: #fafafa"],
+.dark [style*="background:#fafafa"],
+.dark [style*="background: #fafbfc"],
+.dark [style*="background:#fafbfc"],
 .dark [style*="background: rgb(248, 250, 252)"],
 .dark [style*="background: rgb(241, 245, 249)"] {
-  background-color: var(--background) !important;
+  background-color: #1a2436 !important;
+  color: var(--foreground) !important;
 }
 
+/* Soft Tint Banners & Badges */
+.dark [style*="background: #fef2f2"],
+.dark [style*="background:#fef2f2"] {
+  background-color: rgba(229, 35, 33, 0.12) !important;
+  border-color: rgba(229, 35, 33, 0.3) !important;
+}
+.dark [style*="background: #f0fdf4"],
+.dark [style*="background:#f0fdf4"] {
+  background-color: rgba(22, 163, 74, 0.12) !important;
+  border-color: rgba(22, 163, 74, 0.3) !important;
+}
+.dark [style*="background: #eef2ff"],
+.dark [style*="background:#eef2ff"] {
+  background-color: rgba(79, 70, 229, 0.12) !important;
+  border-color: rgba(79, 70, 229, 0.3) !important;
+}
+.dark [style*="background: #fffbeb"],
+.dark [style*="background:#fffbeb"] {
+  background-color: rgba(217, 119, 6, 0.12) !important;
+  border-color: rgba(217, 119, 6, 0.3) !important;
+}
+
+/* Text Colors Overrides */
 .dark [style*="color: #0f172a"],
-.dark [style*="color: rgb(15, 23, 42)"] {
+.dark [style*="color:#0f172a"],
+.dark [style*="color: #1e293b"],
+.dark [style*="color:#1e293b"],
+.dark [style*="color: #334155"],
+.dark [style*="color:#334155"],
+.dark [style*="color: #374151"],
+.dark [style*="color:#374151"],
+.dark [style*="color: #1e293b"],
+.dark [style*="color: rgb(15, 23, 42)"],
+.dark [style*="color: rgb(30, 41, 59)"],
+.dark [style*="color: rgb(51, 65, 85)"] {
   color: var(--foreground) !important;
 }
 
 .dark [style*="color: #64748b"],
+.dark [style*="color:#64748b"],
 .dark [style*="color: #94a3b8"],
+.dark [style*="color:#94a3b8"],
 .dark [style*="color: rgb(100, 116, 139)"],
 .dark [style*="color: rgb(148, 163, 184)"] {
   color: var(--muted-foreground) !important;
 }
 
+/* Border Overrides */
 .dark [style*="border: 1px solid #e2e8f0"],
 .dark [style*="border:1px solid #e2e8f0"],
+.dark [style*="border: 1.5px solid #e2e8f0"],
+.dark [style*="border:1.5px solid #e2e8f0"],
+.dark [style*="border: 2px solid #e2e8f0"],
 .dark [style*="border-bottom: 1px solid #f1f5f9"],
-.dark [style*="border-bottom:1px solid #f1f5f9"] {
+.dark [style*="border-bottom:1px solid #f1f5f9"],
+.dark [style*="border-bottom: 1px solid #e2e8f0"],
+.dark [style*="border-top: 1px solid #f1f5f9"],
+.dark [style*="border-top:1px solid #f1f5f9"],
+.dark [style*="border-right: 1px solid #e8ecf0"],
+.dark [style*="border-right:1px solid #e8ecf0"] {
   border-color: var(--border) !important;
 }
 
+/* Form Controls & Dropdowns */
 .dark input,
 .dark select,
 .dark textarea {
-  background-color: var(--background) !important;
+  background-color: #1a2436 !important;
   color: var(--foreground) !important;
   border-color: var(--border) !important;
+}
+
+.dark select option {
+  background-color: #151e2e !important;
+  color: #f8fafc !important;
 }
 
 .dark input::placeholder,
@@ -118,6 +185,40 @@
   color: var(--muted-foreground) !important;
 }
 
+/* Tables */
+.dark tr[style*="background: #f8fafc"],
+.dark tr[style*="background: #fafbfc"] {
+  background-color: #1a2436 !important;
+}
+
+.dark table th {
+  background-color: #1a2436 !important;
+  color: var(--muted-foreground) !important;
+}
+
+.dark table td {
+  border-color: var(--border) !important;
+}
+
+/* Pill Buttons & Brit Cards */
+.dark .brit-pill-active {
+  background-color: #e52321 !important;
+  color: #ffffff !important;
+  border-color: #e52321 !important;
+}
+
+.dark .brit-pill-inactive {
+  background-color: #1a2436 !important;
+  color: #cbd5e1 !important;
+  border-color: #243049 !important;
+}
+
+.dark .brit-card {
+  background-color: var(--card) !important;
+  border-color: var(--border) !important;
+}
+
+.dark .mobile-bottom-nav,
 .dark .mobile-list-toggle-btn {
   background-color: var(--card) !important;
   border-color: var(--border) !important;
