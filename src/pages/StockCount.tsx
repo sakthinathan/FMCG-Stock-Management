@@ -518,7 +518,7 @@ export function StockCount() {
                     alt={brandName}
                     style={{ maxHeight: 60, maxWidth: 60, objectFit: 'contain', filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.08))' }}
                     onError={(e) => {
-                      (e.currentTarget as HTMLImageElement).src = "https://media.britannia.co.in/Britannia_Logo_fcce3225c0.png";
+                      (e.currentTarget as HTMLImageElement).src = "/brands/logo.webp";
                     }}
                   />
                 </div>
