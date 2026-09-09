@@ -8,6 +8,7 @@ import { supabase } from '@/lib/supabase';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { PageHeader } from '@/components/common/PageHeader';
 import { StatusBadge } from '@/components/common/StatusBadge';
+import { AlertModal } from '@/components/common/AlertModal';
 import { exportDataToExcel, exportReportToPdf, type ReportType } from '@/lib/reportExportUtils';
 
 interface BrandSummaryItem {
@@ -40,6 +41,15 @@ export function Reports() {
   const [compareMode, setCompareMode] = useState(false);
   const [sessions, setSessions] = useState<any[]>([]);
   const [selectedSessionId, setSelectedSessionId] = useState<string>('All');
+  
+  const [alertConfig, setAlertConfig] = useState<{ isOpen: boolean; message: string; title?: string; type?: 'info' | 'error' | 'success' | 'warning' }>({
+    isOpen: false,
+    message: '',
+  });
+
+  const showAlert = (message: string, type: 'info' | 'error' | 'success' | 'warning' = 'info', title?: string) => {
+    setAlertConfig({ isOpen: true, message, type, title });
+  };
   
   const [downloadingType, setDownloadingType] = useState<ReportType | 'pdf' | 'comparison' | null>(null);
   const [selectedBrand, setSelectedBrand] = useState('All Brands');
@@ -311,13 +321,13 @@ export function Reports() {
     try {
       const data = await fetchReportData(type);
       if (!data || data.length === 0) {
-        alert('No records match this report.');
+        showAlert('No records match this report filter.', 'info', 'No Data Available');
         return;
       }
       exportDataToExcel(data, type);
     } catch (e) {
       console.error(e);
-      alert('Failed to generate Excel report.');
+      showAlert('Failed to generate Excel report. Please try again.', 'error', 'Export Failed');
     } finally {
       setDownloadingType(null);
     }
@@ -328,13 +338,13 @@ export function Reports() {
     try {
       const data = await fetchReportData('full');
       if (!data || data.length === 0) {
-        alert('No stock data available to print.');
+        showAlert('No stock data available to print.', 'info', 'No Data Available');
         return;
       }
       exportReportToPdf(data, 'Comprehensive Stock Audit Report', overallStats);
     } catch (e) {
       console.error(e);
-      alert('Failed to generate PDF report.');
+      showAlert('Failed to generate PDF report. Please try again.', 'error', 'Export Failed');
     } finally {
       setDownloadingType(null);
     }
@@ -566,6 +576,14 @@ export function Reports() {
           </table>
         </div>
       </div>
+
+      <AlertModal
+        isOpen={alertConfig.isOpen}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        type={alertConfig.type}
+        onClose={() => setAlertConfig(prev => ({ ...prev, isOpen: false }))}
+      />
     </div>
   );
 }

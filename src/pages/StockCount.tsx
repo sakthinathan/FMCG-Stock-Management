@@ -5,6 +5,7 @@ import { useStockStore } from '@/store/useStockStore';
 import { supabase } from '@/lib/supabase';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { StatusBadge } from '@/components/common/StatusBadge';
+import { AlertModal } from '@/components/common/AlertModal';
 
 const W: React.CSSProperties = { background: '#fff', borderRadius: 12, boxShadow: '0 1px 3px rgba(0,0,0,0.06)' };
 
@@ -46,6 +47,10 @@ export function StockCount() {
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [mobileListOpen, setMobileListOpen] = useState(false);
   const [showCompletionModal, setShowCompletionModal] = useState(false);
+  const [alertConfig, setAlertConfig] = useState<{ isOpen: boolean; message: string; title?: string; type?: 'info' | 'error' | 'success' | 'warning' }>({
+    isOpen: false,
+    message: '',
+  });
 
   // Input refs for seamless mobile keyboard navigation
   const cbbInputRef = useRef<HTMLInputElement>(null);
@@ -325,7 +330,12 @@ export function StockCount() {
         setShowCompletionModal(true);
       } catch (e: any) {
         console.error(e);
-        alert('Failed to complete session: ' + (e.message || JSON.stringify(e)));
+        setAlertConfig({
+          isOpen: true,
+          title: 'Session Completion Error',
+          message: 'Failed to complete session: ' + (e.message || JSON.stringify(e)),
+          type: 'error',
+        });
       } finally {
         setSaving(false);
       }
@@ -765,6 +775,14 @@ export function StockCount() {
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
         @keyframes scaleIn { from { transform: scale(0.95); opacity: 0; } to { transform: scale(1); opacity: 1; } }
       `}</style>
+
+      <AlertModal
+        isOpen={alertConfig.isOpen}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        type={alertConfig.type}
+        onClose={() => setAlertConfig(prev => ({ ...prev, isOpen: false }))}
+      />
     </div>
   );
 }
