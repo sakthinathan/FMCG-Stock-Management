@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useDeferredValue, useMemo, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, ArrowLeft, Loader2, ListChecks, AlertTriangle, Package, Search, CheckCircle2, MessageSquare } from 'lucide-react';
 import { useStockStore } from '@/store/useStockStore';
 import { supabase } from '@/lib/supabase';
@@ -29,6 +29,7 @@ const btn = (primary = true, disabled = false): React.CSSProperties => ({
 export function StockCount() {
   const { sessionId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const { activeUploadId } = useStockStore();
 
   const [brandName, setBrandName] = useState('');
@@ -55,7 +56,7 @@ export function StockCount() {
   const [notes, setNotes] = useState('');
   const [reasonCode, setReasonCode] = useState('');
 
-  // 1. Load session & products with column projections
+  // 1. High-Performance Parallel Session Loader
   useEffect(() => {
     async function loadSession() {
       if (!sessionId || !activeUploadId) {
@@ -63,32 +64,44 @@ export function StockCount() {
         return;
       }
       try {
-        const { data: sessionData, error: sessionError } = await supabase
-          .from('stock_count_sessions')
-          .select('brand')
-          .eq('id', sessionId)
-          .single();
+        let targetBrand = location.state?.brand;
+        if (!targetBrand) {
+          const { data: sessionData, error: sessionError } = await supabase
+            .from('stock_count_sessions')
+            .select('brand')
+            .eq('id', sessionId)
+            .single();
+          if (sessionError) throw sessionError;
+          targetBrand = sessionData?.brand;
+        }
 
-        if (sessionError) throw sessionError;
-        setBrandName(sessionData.brand);
+        if (!targetBrand) return;
+        setBrandName(targetBrand);
 
-        const { data: snapshotData, error: snapError } = await supabase
-          .from('system_stock_snapshots')
-          .select('id, upload_id, material, material_desc, brand, mrp, good_qty, conversion, system_qty_pcs, prev_variance')
-          .eq('upload_id', activeUploadId)
-          .eq('brand', sessionData.brand);
+        // Run snapshot and count queries IN PARALLEL for instant mobile loading
+        const [snapRes, countRes] = await Promise.all([
+          supabase
+            .from('system_stock_snapshots')
+            .select('id, upload_id, material, material_desc, brand, mrp, good_qty, conversion, system_qty_pcs, prev_variance')
+            .eq('upload_id', activeUploadId)
+            .eq('brand', targetBrand),
+          supabase
+            .from('physical_stock_counts')
+            .select('id, session_id, snapshot_id, physical_cbb, physical_pcs, physical_total_pcs, variance, status, notes, reason_code')
+            .eq('session_id', sessionId)
+        ]);
 
-        if (snapError) throw snapError;
+        if (snapRes.error) throw snapRes.error;
+        if (countRes.error) throw countRes.error;
 
-        const { data: countsData, error: countError } = await supabase
-          .from('physical_stock_counts')
-          .select('id, session_id, snapshot_id, physical_cbb, physical_pcs, physical_total_pcs, variance, status, notes, reason_code')
-          .eq('session_id', sessionId);
+        const snapshotData = snapRes.data || [];
+        const countsData = countRes.data || [];
 
-        if (countError) throw countError;
+        // O(1) Map lookup for fast array merging
+        const countMap = new Map(countsData.map(c => [c.snapshot_id, c]));
 
         const merged = snapshotData.map(snap => {
-          const c = countsData?.find(x => x.snapshot_id === snap.id);
+          const c = countMap.get(snap.id);
           return {
             ...snap,
             existingCbb: c ? String(c.physical_cbb) : '',
@@ -105,13 +118,13 @@ export function StockCount() {
           setSelectedProductId(merged[0].id);
         }
       } catch (e) {
-        console.error(e);
+        console.error('Error loading session:', e);
       } finally {
         setLoading(false);
       }
     }
     loadSession();
-  }, [sessionId, activeUploadId]);
+  }, [sessionId, activeUploadId, location.state?.brand]);
 
   // Evaluate simple math in inputs (e.g. 5+10)
   const evaluateMath = (str: string) => {
@@ -231,60 +244,78 @@ export function StockCount() {
 
   const handleSaveAndNext = async () => {
     if (!currentProduct || !sessionId) return;
-    setSaving(true);
-    try {
-      // 1. Force immediately save current state to db
-      const { error } = await supabase
-        .from('physical_stock_counts')
-        .upsert({
-          session_id: sessionId,
-          snapshot_id: currentProduct.id,
-          physical_cbb: cbbVal,
-          physical_pcs: pcsVal,
-          physical_total_pcs: totalPhysical,
-          variance: liveVariance,
-          status: liveStatus,
-          notes,
-          reason_code: reasonCode
-        }, { onConflict: 'session_id,snapshot_id' });
+    
+    // Save active state values
+    const activeId = currentProduct.id;
+    const activeCbb = cbb;
+    const activePcs = pcs;
+    const activeNotes = notes;
+    const activeReason = reasonCode;
+    const activeVariance = liveVariance;
+    const activeStatus = liveStatus;
+    const activeCbbVal = cbbVal;
+    const activePcsVal = pcsVal;
+    const activeTotalPhysical = totalPhysical;
 
-      if (error) throw error;
+    // 1. Optimistically update local memory state immediately
+    const updatedProducts = allProducts.map(p => p.id === activeId ? {
+      ...p,
+      existingCbb: activeCbb,
+      existingPcs: activePcs,
+      existingNotes: activeNotes,
+      existingReason: activeReason,
+      existingStatus: activeStatus,
+      existingVariance: activeVariance
+    } : p);
+    setAllProducts(updatedProducts);
 
-      // Update local memory
-      const updatedProducts = allProducts.map(p => p.id === currentProduct.id ? {
-        ...p,
-        existingCbb: cbb,
-        existingPcs: pcs,
-        existingNotes: notes,
-        existingReason: reasonCode,
-        existingStatus: liveStatus,
-        existingVariance: liveVariance
-      } : p);
-      setAllProducts(updatedProducts);
-
-      // Determine next product BEFORE changing the active product
-      // If hideCounted is true, the current product will be filtered out. 
-      // So the next item will actually shift to the same position (currentIndex).
-      // Let's compute next item carefully:
-      let nextProduct = null;
-      if (hideCounted) {
-        // Find next product in the list that is NOT the current one and is uncounted
-        const remainingUncounted = filteredProducts.filter(p => p.id !== currentProduct.id);
-        if (remainingUncounted.length > 0) {
-          // Stay at same index if possible, or clamp to last
-          const nextIdx = Math.min(currentIndex, remainingUncounted.length - 1);
-          nextProduct = remainingUncounted[nextIdx];
-        }
-      } else {
-        if (currentIndex < filteredProducts.length - 1) {
-          nextProduct = filteredProducts[currentIndex + 1];
-        }
+    // 2. Calculate next product immediately
+    let nextProduct = null;
+    if (hideCounted) {
+      const remainingUncounted = filteredProducts.filter(p => p.id !== activeId);
+      if (remainingUncounted.length > 0) {
+        const nextIdx = Math.min(currentIndex, remainingUncounted.length - 1);
+        nextProduct = remainingUncounted[nextIdx];
       }
+    } else {
+      if (currentIndex < filteredProducts.length - 1) {
+        nextProduct = filteredProducts[currentIndex + 1];
+      }
+    }
 
-      if (nextProduct) {
-        setSelectedProductId(nextProduct.id);
-      } else {
-        // Complete session
+    // 3. Immediately move to next SKU for 0ms UI lag
+    if (nextProduct) {
+      setSelectedProductId(nextProduct.id);
+    }
+
+    // 4. Asynchronously save count to Supabase in the background
+    const savePromise = (async () => {
+      try {
+        const { error } = await supabase
+          .from('physical_stock_counts')
+          .upsert({
+            session_id: sessionId,
+            snapshot_id: activeId,
+            physical_cbb: activeCbbVal,
+            physical_pcs: activePcsVal,
+            physical_total_pcs: activeTotalPhysical,
+            variance: activeVariance,
+            status: activeStatus,
+            notes: activeNotes,
+            reason_code: activeReason
+          }, { onConflict: 'session_id,snapshot_id' });
+
+        if (error) throw error;
+      } catch (e: any) {
+        console.error('Background save error:', e);
+      }
+    })();
+
+    // 5. If end of queue, wait for savePromise and mark session completed
+    if (!nextProduct) {
+      setSaving(true);
+      try {
+        await savePromise;
         const { error: completeErr } = await supabase
           .from('stock_count_sessions')
           .update({ status: 'Completed' })
@@ -292,12 +323,12 @@ export function StockCount() {
         if (completeErr) throw completeErr;
         alert('Audit session completed!');
         navigate('/brands');
+      } catch (e: any) {
+        console.error(e);
+        alert('Failed to complete session: ' + (e.message || JSON.stringify(e)));
+      } finally {
+        setSaving(false);
       }
-    } catch (e: any) {
-      console.error(e);
-      alert('Failed to save count: ' + (e.message || e.details || JSON.stringify(e)));
-    } finally {
-      setSaving(false);
     }
   };
 

@@ -113,7 +113,7 @@ export function BrandSelection() {
 
   const handleStart = async (name: string, sessionId: string | null) => {
     if (sessionId) {
-      navigate(`/count/${sessionId}`);
+      navigate(`/count/${sessionId}`, { state: { brand: name } });
       return;
     }
     setPendingBrandName(name);
@@ -138,7 +138,7 @@ export function BrandSelection() {
         .single();
 
       if (data) {
-        navigate(`/count/${data.id}`);
+        navigate(`/count/${data.id}`, { state: { brand: pendingBrandName } });
       }
     } catch (e) {
       console.error(e);
