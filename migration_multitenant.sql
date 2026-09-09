@@ -1,3 +1,19 @@
+-- ==========================================
+-- COMPLETE DATABASE CLEANUP & FRESH RESET SCRIPT
+-- WARNING: Wipes all agencies, accounts, stock files & counts to start 100% fresh!
+-- ==========================================
+
+-- 0. Truncate all application data tables
+TRUNCATE TABLE physical_stock_counts CASCADE;
+TRUNCATE TABLE stock_count_sessions CASCADE;
+TRUNCATE TABLE system_stock_snapshots CASCADE;
+TRUNCATE TABLE stock_uploads CASCADE;
+TRUNCATE TABLE profiles CASCADE;
+TRUNCATE TABLE agencies CASCADE;
+
+-- Delete all Auth Users (wipes all existing signups/logins)
+DELETE FROM auth.users;
+
 -- 1. Create agencies table
 CREATE TABLE IF NOT EXISTS agencies (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
