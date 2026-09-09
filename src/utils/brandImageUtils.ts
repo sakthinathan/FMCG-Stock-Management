@@ -46,11 +46,31 @@ export const BRITANNIA_BRAND_IMAGES: Record<string, BrandAsset> = {
   },
   "WINKIN COW": {
     local: `${BASE}/brands/winkin_cow.webp`,
-    cdn: "https://media.britannia.co.in/Winkin_Cow_Winkin_Shake_Strawberry_Pack_new_86a255fcda.jpg"
+    cdn: "https://media.britannia.co.in/Winkin_Cow_Flavoured_Milk_a760dcc2b3.png"
   },
   "WINKIN' COW": {
     local: `${BASE}/brands/winkin_cow.webp`,
-    cdn: "https://media.britannia.co.in/Winkin_Cow_Winkin_Shake_Strawberry_Pack_new_86a255fcda.jpg"
+    cdn: "https://media.britannia.co.in/Winkin_Cow_Flavoured_Milk_a760dcc2b3.png"
+  },
+  "WINIKIN": {
+    local: `${BASE}/brands/winkin_cow.webp`,
+    cdn: "https://media.britannia.co.in/Winkin_Cow_Flavoured_Milk_a760dcc2b3.png"
+  },
+  "WINKIN": {
+    local: `${BASE}/brands/winkin_cow.webp`,
+    cdn: "https://media.britannia.co.in/Winkin_Cow_Flavoured_Milk_a760dcc2b3.png"
+  },
+  "MILKSHAKE": {
+    local: `${BASE}/brands/winkin_cow.webp`,
+    cdn: "https://media.britannia.co.in/Winkin_Cow_Flavoured_Milk_a760dcc2b3.png"
+  },
+  "MILK SHAKE": {
+    local: `${BASE}/brands/winkin_cow.webp`,
+    cdn: "https://media.britannia.co.in/Winkin_Cow_Flavoured_Milk_a760dcc2b3.png"
+  },
+  "BADAM MILK": {
+    local: `${BASE}/brands/winkin_cow.webp`,
+    cdn: "https://media.britannia.co.in/Winkin_Cow_Flavoured_Badam_Milk_Pack_7b6970cc20.png"
   },
   "CHEESE": {
     local: `${BASE}/brands/cheese.webp`,
@@ -145,13 +165,21 @@ export const BRITANNIA_BRAND_IMAGES: Record<string, BrandAsset> = {
 export const DEFAULT_BRITANNIA_LOGO = `${BASE}/brands/logo.webp`;
 export const DEFAULT_BRITANNIA_CDN_LOGO = "https://media.britannia.co.in/Britannia_Logo_fcce3225c0.png";
 
+function normalizeBrand(name: string): string {
+  if (!name) return '';
+  return name.toUpperCase().trim()
+    .replace(/WINIKIN/g, 'WINKIN')
+    .replace(/WINIKEN/g, 'WINKIN')
+    .replace(/WINKING/g, 'WINKIN');
+}
+
 /**
  * Returns the matching WebP brand packshot image URL for a given brand name.
  */
 export function getBritanniaBrandImage(brandName: string): string {
   if (!brandName) return DEFAULT_BRITANNIA_LOGO;
   
-  const upper = brandName.toUpperCase().trim();
+  const upper = normalizeBrand(brandName);
   
   if (BRITANNIA_BRAND_IMAGES[upper]) {
     return BRITANNIA_BRAND_IMAGES[upper].local;
@@ -172,7 +200,7 @@ export function getBritanniaBrandImage(brandName: string): string {
 export function getBritanniaFallbackCDN(brandName: string): string {
   if (!brandName) return DEFAULT_BRITANNIA_CDN_LOGO;
   
-  const upper = brandName.toUpperCase().trim();
+  const upper = normalizeBrand(brandName);
   
   if (BRITANNIA_BRAND_IMAGES[upper]) {
     return BRITANNIA_BRAND_IMAGES[upper].cdn;
