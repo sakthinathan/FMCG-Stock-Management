@@ -27,8 +27,11 @@ interface BrandSummaryItem {
 
 const W: React.CSSProperties = { background: '#fff', borderRadius: 12, boxShadow: '0 1px 3px rgba(0,0,0,0.06)' };
 
+import { useAuth } from '@/contexts/AuthContext';
+
 export function Reports() {
   const { activeUploadId } = useStockStore();
+  const { agency, profile } = useAuth();
   
   // Selection and Filter States
   const [uploads, setUploads] = useState<any[]>([]);
@@ -55,13 +58,17 @@ export function Reports() {
   });
   const [comparisonRows, setComparisonRows] = useState<any[]>([]);
 
+  const currentAgencyId = agency?.id || profile?.agency_id;
+
   // 1. Fetch upload history
   useEffect(() => {
     async function fetchUploads() {
       try {
+        if (!currentAgencyId) return;
         const { data } = await supabase
           .from('stock_uploads')
           .select('*')
+          .eq('agency_id', currentAgencyId)
           .order('uploaded_at', { ascending: false });
         if (data) {
           setUploads(data);
@@ -76,7 +83,7 @@ export function Reports() {
       }
     }
     fetchUploads();
-  }, [activeUploadId]);
+  }, [activeUploadId, currentAgencyId]);
 
   // 2. Fetch sessions for the selected upload
   useEffect(() => {

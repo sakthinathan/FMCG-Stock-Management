@@ -154,7 +154,7 @@ export function AppLayout() {
               {agency?.name?.[0]?.toUpperCase() || 'A'}
             </div>
             <div style={{ minWidth: 0 }}>
-              <p style={{ fontSize: 12, fontWeight: 700, color: '#1e293b', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{agency?.name || 'Thulir Agency'}</p>
+              <p style={{ fontSize: 12, fontWeight: 700, color: '#1e293b', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{agency?.name || 'Distributor Agency'}</p>
               <p style={{ fontSize: 10, color: '#e52321', margin: '1px 0 0', fontWeight: 700 }}>
                 {agency?.aw_code ? `AW Code: ${agency.aw_code}` : 'Distributor'}
               </p>
@@ -303,7 +303,7 @@ export function AppLayout() {
                       <Building size={15} color="#e52321" style={{ flexShrink: 0 }} />
                       <div style={{ textAlign: 'left', minWidth: 0, flex: 1 }}>
                         <p style={{ margin: 0, fontWeight: 600, fontSize: 13, color: '#0f172a' }}>Agency Profile</p>
-                        <p style={{ margin: 0, fontSize: 10, color: '#64748b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{agency?.name || 'THULIR AGENCY'}</p>
+                        <p style={{ margin: 0, fontSize: 10, color: '#64748b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{agency?.name || 'Distributor Agency'}</p>
                       </div>
                     </button>
                     <button
@@ -360,7 +360,7 @@ export function AppLayout() {
               </span>
             </div>
             <p style={{ fontSize: 11, color: '#64748b', margin: 0, fontWeight: 500 }}>
-              © 2026 {agency?.name || 'Thulir Agency'} · Enterprise Stock Audit Platform
+              © 2026 {agency?.name || 'Distributor Agency'} · Enterprise Stock Audit Platform
             </p>
           </footer>
         </main>

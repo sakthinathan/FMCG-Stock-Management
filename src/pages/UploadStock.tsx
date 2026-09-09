@@ -17,7 +17,7 @@ const btn = (primary = true): React.CSSProperties => ({
 });
 
 export function UploadStock() {
-  const { profile } = useAuth();
+  const { profile, agency } = useAuth();
   const [isUploading, setIsUploading] = useState(false);
   const [parseResult, setParseResult] = useState<ParseResult | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -26,12 +26,19 @@ export function UploadStock() {
   const [uploadHistory, setUploadHistory] = useState<any[]>([]);
   const { activeUploadId, setActiveUpload } = useStockStore();
 
+  const currentAgencyId = agency?.id || profile?.agency_id;
+
   const fetchHistory = async () => {
-    const { data } = await supabase.from('stock_uploads').select('*').order('uploaded_at', { ascending: false });
+    if (!currentAgencyId) return;
+    const { data } = await supabase
+      .from('stock_uploads')
+      .select('*')
+      .eq('agency_id', currentAgencyId)
+      .order('uploaded_at', { ascending: false });
     if (data) setUploadHistory(data);
   };
 
-  useEffect(() => { fetchHistory(); }, []);
+  useEffect(() => { fetchHistory(); }, [currentAgencyId]);
 
   const formatStockFileName = (originalName: string): string => {
     const now = new Date();
@@ -61,20 +68,26 @@ export function UploadStock() {
       const formattedFileName = formatStockFileName(file.name);
 
       const { data: uploadData, error: uploadError } = await supabase.from('stock_uploads')
-        .insert({ file_name: formattedFileName, total_records: result.products.length, agency_id: profile?.agency_id }).select().single();
+        .insert({ file_name: formattedFileName, total_records: result.products.length, agency_id: currentAgencyId }).select().single();
       if (uploadError) throw uploadError;
 
       const prevVariances = new Map();
       try {
-        const { data: lastUploads } = await supabase.from('stock_uploads').select('id').order('uploaded_at', { ascending: false }).limit(2);
-        if (lastUploads && lastUploads.length > 1) {
-          const prevId = lastUploads[1].id;
-          const { data: prevSnaps } = await supabase.from('system_stock_snapshots').select('id, material, mrp').eq('upload_id', prevId);
-          if (prevSnaps) {
-            const { data: prevCounts } = await supabase.from('physical_stock_counts').select('snapshot_id, variance');
-            if (prevCounts) {
-              const cm = new Map(prevCounts.map(c => [c.snapshot_id, c.variance]));
-              prevSnaps.forEach(s => { if (cm.has(s.id)) prevVariances.set(`${s.material}_${s.mrp}`, cm.get(s.id)); });
+        if (currentAgencyId) {
+          const { data: lastUploads } = await supabase.from('stock_uploads')
+            .select('id')
+            .eq('agency_id', currentAgencyId)
+            .order('uploaded_at', { ascending: false })
+            .limit(2);
+          if (lastUploads && lastUploads.length > 1) {
+            const prevId = lastUploads[1].id;
+            const { data: prevSnaps } = await supabase.from('system_stock_snapshots').select('id, material, mrp').eq('upload_id', prevId);
+            if (prevSnaps) {
+              const { data: prevCounts } = await supabase.from('physical_stock_counts').select('snapshot_id, variance');
+              if (prevCounts) {
+                const cm = new Map(prevCounts.map(c => [c.snapshot_id, c.variance]));
+                prevSnaps.forEach(s => { if (cm.has(s.id)) prevVariances.set(`${s.material}_${s.mrp}`, cm.get(s.id)); });
+              }
             }
           }
         }

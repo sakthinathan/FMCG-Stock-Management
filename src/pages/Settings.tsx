@@ -128,11 +128,11 @@ export function Settings() {
           <div style={{ padding: '18px 22px', display: 'flex', flexDirection: 'column', gap: 14 }}>
             <div>
               <p style={{ fontSize: 11, fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 4px' }}>AW Code</p>
-              <p style={{ fontSize: 15, fontWeight: 800, color: '#e52321', margin: 0, fontFamily: 'monospace' }}>{agency?.aw_code || 'AW0001'}</p>
+              <p style={{ fontSize: 15, fontWeight: 800, color: '#e52321', margin: 0, fontFamily: 'monospace' }}>{agency?.aw_code || 'N/A'}</p>
             </div>
             <div>
               <p style={{ fontSize: 11, fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 4px' }}>Agency Name & Location</p>
-              <p style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', margin: 0 }}>{agency?.name || 'Thulir Agency'}{agency?.district ? ` (${agency.district})` : ''}</p>
+              <p style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', margin: 0 }}>{agency?.name || 'Distributor Agency'}{agency?.district ? ` (${agency.district})` : ''}</p>
             </div>
             {agency?.mobile && (
               <div>
