@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { StatusBadge } from '@/components/common/StatusBadge';
 import { AlertModal } from '@/components/common/AlertModal';
+import { getBritanniaBrandImage } from '@/utils/brandImageUtils';
 
 const W: React.CSSProperties = { background: '#fff', borderRadius: 12, boxShadow: '0 1px 3px rgba(0,0,0,0.06)' };
 
@@ -492,16 +493,34 @@ export function StockCount() {
           ) : (
             <div style={{ ...W, padding: '24px 28px', display: 'flex', flexDirection: 'column', gap: 20 }}>
               
-              {/* Product Info */}
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 6 }}>
-                  <span style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Item {currentIndex + 1} of {filteredProducts.length}</span>
-                  <span className="brit-badge-mrp">MRP ₹{currentProduct.mrp}</span>
+              {/* Product Info with Britannia Packshot */}
+              <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', justifyContent: 'space-between' }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 6 }}>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Item {currentIndex + 1} of {filteredProducts.length}</span>
+                    <span className="brit-badge-mrp">MRP ₹{currentProduct.mrp}</span>
+                  </div>
+                  <h2 style={{ fontSize: 20, fontWeight: 800, color: '#0f172a', margin: '0 0 10px', lineHeight: 1.3 }}>{currentProduct.material_desc}</h2>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: '#e52321', fontFamily: 'monospace', background: '#fef2f2', padding: '3px 8px', borderRadius: 6, border: '1px solid #fecaca' }}>SKU {currentProduct.material}</span>
+                    <span style={{ fontSize: 11, fontWeight: 600, color: '#4b5563', background: '#f3f4f6', padding: '3px 8px', borderRadius: 6 }}>1 Case (CBB) = {currentProduct.conversion} PCS</span>
+                  </div>
                 </div>
-                <h2 style={{ fontSize: 20, fontWeight: 800, color: '#0f172a', margin: '0 0 10px', lineHeight: 1.3 }}>{currentProduct.material_desc}</h2>
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                  <span style={{ fontSize: 11, fontWeight: 700, color: '#e52321', fontFamily: 'monospace', background: '#fef2f2', padding: '3px 8px', borderRadius: 6, border: '1px solid #fecaca' }}>SKU {currentProduct.material}</span>
-                  <span style={{ fontSize: 11, fontWeight: 600, color: '#4b5563', background: '#f3f4f6', padding: '3px 8px', borderRadius: 6 }}>1 Case (CBB) = {currentProduct.conversion} PCS</span>
+
+                {/* Official Packshot Preview */}
+                <div style={{
+                  width: 72, height: 72, padding: 6, borderRadius: 14, background: '#fff',
+                  border: '1px solid #e2e8f0', boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
+                }}>
+                  <img
+                    src={getBritanniaBrandImage(brandName || currentProduct.material_desc)}
+                    alt={brandName}
+                    style={{ maxHeight: 60, maxWidth: 60, objectFit: 'contain', filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.08))' }}
+                    onError={(e) => {
+                      (e.currentTarget as HTMLImageElement).src = "https://media.britannia.co.in/Britannia_Logo_fcce3225c0.png";
+                    }}
+                  />
                 </div>
               </div>
 

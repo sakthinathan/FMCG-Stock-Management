@@ -10,6 +10,7 @@ import { EmptyState } from '@/components/common/EmptyState';
 import { PageHeader } from '@/components/common/PageHeader';
 import { StatusBadge } from '@/components/common/StatusBadge';
 import { ConfirmModal } from '@/components/common/ConfirmModal';
+import { getBritanniaBrandImage } from '@/utils/brandImageUtils';
 
 interface BrandSummary {
   name: string;
@@ -320,31 +321,46 @@ export function BrandSelection() {
                   boxSizing: 'border-box',
                 }}
               >
-                {/* Top header inside card */}
-                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
+                {/* Top header inside card with official Britannia Brand Artwork */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
                   <div
                     style={{
-                      width: 40,
-                      height: 40,
-                      borderRadius: 10,
-                      background: isDone ? '#f0fdf4' : isInProgress ? '#fef2f2' : '#f8fafc',
+                      height: 52,
+                      padding: '4px 10px',
+                      borderRadius: 12,
+                      background: '#fff',
+                      border: '1px solid #f1f5f9',
+                      boxShadow: '0 2px 6px rgba(0,0,0,0.04)',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
                       flexShrink: 0,
+                      maxWidth: 120,
                     }}
                   >
-                    <Building2 size={18} color={isDone ? '#16a34a' : isInProgress ? '#e52321' : '#94a3b8'} />
+                    <img
+                      src={getBritanniaBrandImage(brand.name)}
+                      alt={brand.name}
+                      style={{
+                        maxHeight: 44,
+                        maxWidth: 100,
+                        objectFit: 'contain',
+                        filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.08))',
+                      }}
+                      onError={(e) => {
+                        (e.currentTarget as HTMLImageElement).src = "https://media.britannia.co.in/Britannia_Logo_fcce3225c0.png";
+                      }}
+                    />
                   </div>
                   <StatusBadge status={brand.status} size="sm" />
                 </div>
 
                 {/* Brand name & details */}
                 <div>
-                  <h3 style={{ fontSize: 16, fontWeight: 800, color: '#0f172a', margin: '0 0 3px', textTransform: 'uppercase' }}>
+                  <h3 style={{ fontSize: 16, fontWeight: 800, color: '#0f172a', margin: '0 0 3px', textTransform: 'uppercase', letterSpacing: '-0.01em' }}>
                     {brand.name}
                   </h3>
-                  <p style={{ fontSize: 12, color: '#64748b', margin: 0 }}>
+                  <p style={{ fontSize: 12, color: '#64748b', margin: 0, fontWeight: 500 }}>
                     {brand.countedProducts} / {brand.totalProducts} counted
                   </p>
                 </div>
