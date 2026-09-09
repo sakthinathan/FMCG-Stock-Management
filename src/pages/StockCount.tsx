@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useDeferredValue, useMemo } from 'react';
+import React, { useState, useEffect, useDeferredValue, useMemo, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, ArrowLeft, Loader2, ListChecks, AlertTriangle, Package, Search, CheckCircle2, MessageSquare } from 'lucide-react';
 import { useStockStore } from '@/store/useStockStore';
@@ -44,6 +44,10 @@ export function StockCount() {
   const [saving, setSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [mobileListOpen, setMobileListOpen] = useState(false);
+
+  // Input refs for seamless mobile keyboard navigation
+  const cbbInputRef = useRef<HTMLInputElement>(null);
+  const pcsInputRef = useRef<HTMLInputElement>(null);
 
   // Input states
   const [cbb, setCbb] = useState('');
@@ -149,7 +153,7 @@ export function StockCount() {
   const currentProduct = allProducts.find(p => p.id === selectedProductId) || filteredProducts[0];
   const currentIndex = currentProduct ? filteredProducts.findIndex(p => p.id === currentProduct.id) : -1;
 
-  // Initialize inputs when selected product changes
+  // Initialize inputs when selected product changes & auto-focus CBB input
   useEffect(() => {
     if (currentProduct) {
       setCbb(currentProduct.existingCbb);
@@ -157,11 +161,20 @@ export function StockCount() {
       setNotes(currentProduct.existingNotes);
       setReasonCode(currentProduct.existingReason);
       setSaveStatus('idle');
+
+      // Auto-focus CBB input so soft numeric keypad stays open
+      const timer = setTimeout(() => {
+        if (cbbInputRef.current) {
+          cbbInputRef.current.focus();
+          cbbInputRef.current.select();
+        }
+      }, 60);
+      return () => clearTimeout(timer);
     } else {
       setCbb(''); setPcs(''); setNotes(''); setReasonCode('');
       setSaveStatus('idle');
     }
-  }, [selectedProductId, allProducts]);
+  }, [selectedProductId]);
 
   // Calculate live variance
   const cbbVal = evaluateMath(cbb) !== '' ? parseInt(evaluateMath(cbb), 10) : 0;
@@ -452,52 +465,73 @@ export function StockCount() {
               </div>
 
               {/* Large Touch Input Grid */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-                <div>
-                  <label style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', display: 'block', marginBottom: 6 }}>Cartons (CBB)</label>
-                  <input
-                    type="text" placeholder="0"
-                    inputMode="numeric" pattern="[0-9]*"
-                    value={cbb}
-                    onKeyDown={e => {
-                      if (!/[0-9]/.test(e.key) && !['Backspace', 'Delete', 'Tab', 'ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key) && !e.metaKey && !e.ctrlKey) {
+              <form onSubmit={e => { e.preventDefault(); handleSaveAndNext(); }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                  <div>
+                    <label style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', display: 'block', marginBottom: 6 }}>Cartons (CBB)</label>
+                    <input
+                      ref={cbbInputRef}
+                      type="text" placeholder="0"
+                      inputMode="numeric" pattern="[0-9]*" enterKeyHint="next"
+                      value={cbb}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter' || e.key === 'ArrowRight') {
+                          e.preventDefault();
+                          if (pcsInputRef.current) {
+                            pcsInputRef.current.focus();
+                            pcsInputRef.current.select();
+                          } else {
+                            handleSaveAndNext();
+                          }
+                        } else if (!/[0-9]/.test(e.key) && !['Backspace', 'Delete', 'Tab', 'ArrowLeft', 'Home', 'End'].includes(e.key) && !e.metaKey && !e.ctrlKey) {
+                          e.preventDefault();
+                        }
+                      }}
+                      onPaste={e => {
                         e.preventDefault();
-                      }
-                    }}
-                    onPaste={e => {
-                      e.preventDefault();
-                      const pasted = e.clipboardData.getData('text').replace(/[^0-9]/g, '');
-                      setCbb(pasted);
-                    }}
-                    onChange={e => setCbb(e.target.value.replace(/[^0-9]/g, ''))}
-                    style={{ width: '100%', height: 64, border: '1.5px solid #e2e8f0', borderRadius: 12, fontSize: 28, fontWeight: 800, textAlign: 'center', outline: 'none', background: '#fff', boxSizing: 'border-box', fontFamily: 'inherit' }}
-                    onFocus={e => e.target.select()}
-                  />
-                  <span style={{ fontSize: 10, color: '#94a3b8', display: 'block', marginTop: 4, textAlign: 'center' }}>= {cbbVal * currentProduct.conversion} PCS</span>
-                </div>
-                <div>
-                  <label style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', display: 'block', marginBottom: 6 }}>Loose (PCS)</label>
-                  <input
-                    type="text" placeholder="0"
-                    inputMode="numeric" pattern="[0-9]*"
-                    value={pcs}
-                    onKeyDown={e => {
-                      if (!/[0-9]/.test(e.key) && !['Backspace', 'Delete', 'Tab', 'ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key) && !e.metaKey && !e.ctrlKey) {
+                        const pasted = e.clipboardData.getData('text').replace(/[^0-9]/g, '');
+                        setCbb(pasted);
+                      }}
+                      onChange={e => setCbb(e.target.value.replace(/[^0-9]/g, ''))}
+                      style={{ width: '100%', height: 64, border: '1.5px solid #e2e8f0', borderRadius: 12, fontSize: 28, fontWeight: 800, textAlign: 'center', outline: 'none', background: '#fff', boxSizing: 'border-box', fontFamily: 'inherit' }}
+                      onFocus={e => e.target.select()}
+                    />
+                    <span style={{ fontSize: 10, color: '#94a3b8', display: 'block', marginTop: 4, textAlign: 'center' }}>= {cbbVal * currentProduct.conversion} PCS</span>
+                  </div>
+                  <div>
+                    <label style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', display: 'block', marginBottom: 6 }}>Loose (PCS)</label>
+                    <input
+                      ref={pcsInputRef}
+                      type="text" placeholder="0"
+                      inputMode="numeric" pattern="[0-9]*" enterKeyHint="done"
+                      value={pcs}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter' || e.key === 'ArrowRight') {
+                          e.preventDefault();
+                          handleSaveAndNext();
+                        } else if (e.key === 'ArrowLeft') {
+                          e.preventDefault();
+                          if (cbbInputRef.current) {
+                            cbbInputRef.current.focus();
+                            cbbInputRef.current.select();
+                          }
+                        } else if (!/[0-9]/.test(e.key) && !['Backspace', 'Delete', 'Tab', 'Home', 'End'].includes(e.key) && !e.metaKey && !e.ctrlKey) {
+                          e.preventDefault();
+                        }
+                      }}
+                      onPaste={e => {
                         e.preventDefault();
-                      }
-                    }}
-                    onPaste={e => {
-                      e.preventDefault();
-                      const pasted = e.clipboardData.getData('text').replace(/[^0-9]/g, '');
-                      setPcs(pasted);
-                    }}
-                    onChange={e => setPcs(e.target.value.replace(/[^0-9]/g, ''))}
-                    style={{ width: '100%', height: 64, border: '1.5px solid #e2e8f0', borderRadius: 12, fontSize: 28, fontWeight: 800, textAlign: 'center', outline: 'none', background: '#fff', boxSizing: 'border-box', fontFamily: 'inherit' }}
-                    onFocus={e => e.target.select()}
-                  />
-                  <span style={{ fontSize: 10, color: '#94a3b8', display: 'block', marginTop: 4, textAlign: 'center' }}>Single pieces</span>
+                        const pasted = e.clipboardData.getData('text').replace(/[^0-9]/g, '');
+                        setPcs(pasted);
+                      }}
+                      onChange={e => setPcs(e.target.value.replace(/[^0-9]/g, ''))}
+                      style={{ width: '100%', height: 64, border: '1.5px solid #e2e8f0', borderRadius: 12, fontSize: 28, fontWeight: 800, textAlign: 'center', outline: 'none', background: '#fff', boxSizing: 'border-box', fontFamily: 'inherit' }}
+                      onFocus={e => e.target.select()}
+                    />
+                    <span style={{ fontSize: 10, color: '#94a3b8', display: 'block', marginTop: 4, textAlign: 'center' }}>Single pieces</span>
+                  </div>
                 </div>
-              </div>
+              </form>
 
               {/* Calculation Summary Row */}
               <div style={{ background: '#f8fafc', borderRadius: 10, padding: 14, display: 'flex', flexDirection: 'column', gap: 10, border: '1px solid #f1f5f9' }}>
