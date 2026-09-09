@@ -191,7 +191,7 @@ export function Login() {
           {/* AW Code Input */}
           <div>
             <label style={{ fontSize: 12, fontWeight: 700, color: '#374151', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: 6 }}>
-              AW Code (Agency Code)
+              AW Code (5-Digit Number)
             </label>
             <div style={{ position: 'relative' }}>
               <Hash size={15} color="#94a3b8" style={{ position: 'absolute', left: 13, top: '50%', transform: 'translateY(-50%)' }} />
@@ -199,14 +199,14 @@ export function Login() {
                 <Loader2 size={15} color="#e52321" style={{ position: 'absolute', right: 13, top: '50%', transform: 'translateY(-50%)', animation: 'spin 1s linear infinite' }} />
               )}
               <input
-                type="text" placeholder="e.g. AW100234"
-                value={awCode} onChange={e => setAwCode(e.target.value.toUpperCase())} required
+                type="text" inputMode="numeric" placeholder="e.g. 25999" maxLength={5}
+                value={awCode} onChange={e => setAwCode(e.target.value.replace(/\D/g, '').slice(0, 5))} required
                 style={{
                   width: '100%', height: 46, paddingLeft: 38, paddingRight: 38,
                   border: agencyData ? '2px solid #16a34a' : agencyNotFound ? '2px solid #ef4444' : '1.5px solid #e2e8f0',
                   borderRadius: 10, fontSize: 15, fontWeight: 700,
                   color: '#0f172a', background: '#fff', boxSizing: 'border-box',
-                  outline: 'none', fontFamily: 'inherit', letterSpacing: '0.04em'
+                  outline: 'none', fontFamily: 'inherit', letterSpacing: '0.06em'
                 }}
               />
             </div>
@@ -320,11 +320,11 @@ export function Login() {
 
             <form onSubmit={handleResetPassword} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               <div>
-                <label style={{ fontSize: 11, fontWeight: 700, color: '#475569', textTransform: 'uppercase' }}>AW Code *</label>
+                <label style={{ fontSize: 11, fontWeight: 700, color: '#475569', textTransform: 'uppercase' }}>AW Code (5-Digit Number) *</label>
                 <input
-                  type="text" required placeholder="e.g. AW100234"
-                  value={resetAwCode} onChange={e => setResetAwCode(e.target.value.toUpperCase())}
-                  style={{ width: '100%', height: 40, border: '1.5px solid #e2e8f0', borderRadius: 8, padding: '0 12px', fontSize: 13, fontWeight: 700, outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }}
+                  type="text" inputMode="numeric" required placeholder="e.g. 25999" maxLength={5}
+                  value={resetAwCode} onChange={e => setResetAwCode(e.target.value.replace(/\D/g, '').slice(0, 5))}
+                  style={{ width: '100%', height: 40, border: '1.5px solid #e2e8f0', borderRadius: 8, padding: '0 12px', fontSize: 13, fontWeight: 700, outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box', letterSpacing: '0.05em' }}
                 />
               </div>
 

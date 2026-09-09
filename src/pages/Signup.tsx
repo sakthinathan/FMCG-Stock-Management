@@ -18,9 +18,9 @@ export function Signup() {
     e.preventDefault();
     setError(null);
 
-    const cleanAwCode = awCode.trim().toUpperCase();
-    if (!cleanAwCode) {
-      setError('Please enter a valid AW Code.');
+    const cleanAwCode = awCode.trim();
+    if (!/^\d{5}$/.test(cleanAwCode)) {
+      setError('AW Code must be exactly 5 numeric digits (e.g. 25999).');
       return;
     }
 
@@ -146,13 +146,13 @@ export function Signup() {
           
           {/* AW Code */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-            <label style={{ fontSize: 11, fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>AW Code (Unique Agency Code) *</label>
+            <label style={{ fontSize: 11, fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>AW Code (5-Digit Number) *</label>
             <div style={{ position: 'relative' }}>
               <Hash size={15} color="#94a3b8" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }} />
               <input
-                type="text" required placeholder="e.g. AW100234"
-                value={awCode} onChange={e => setAwCode(e.target.value.toUpperCase())}
-                style={{ width: '100%', height: 42, background: '#fff', border: '1.5px solid #e2e8f0', borderRadius: 10, paddingLeft: 36, paddingRight: 14, color: '#0f172a', fontSize: 14, fontWeight: 700, outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }}
+                type="text" inputMode="numeric" required placeholder="e.g. 25999" maxLength={5}
+                value={awCode} onChange={e => setAwCode(e.target.value.replace(/\D/g, '').slice(0, 5))}
+                style={{ width: '100%', height: 42, background: '#fff', border: '1.5px solid #e2e8f0', borderRadius: 10, paddingLeft: 36, paddingRight: 14, color: '#0f172a', fontSize: 14, fontWeight: 700, outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box', letterSpacing: '0.06em' }}
               />
             </div>
           </div>
