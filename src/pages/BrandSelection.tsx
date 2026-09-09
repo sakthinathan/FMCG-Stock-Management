@@ -10,7 +10,7 @@ import { EmptyState } from '@/components/common/EmptyState';
 import { PageHeader } from '@/components/common/PageHeader';
 import { StatusBadge } from '@/components/common/StatusBadge';
 import { ConfirmModal } from '@/components/common/ConfirmModal';
-import { getBritanniaBrandImage } from '@/utils/brandImageUtils';
+import { getBritanniaBrandImage, getBritanniaFallbackCDN } from '@/utils/brandImageUtils';
 
 interface BrandSummary {
   name: string;
@@ -348,7 +348,7 @@ export function BrandSelection() {
                         filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.08))',
                       }}
                       onError={(e) => {
-                        (e.currentTarget as HTMLImageElement).src = "/brands/logo.webp";
+                        (e.currentTarget as HTMLImageElement).src = getBritanniaFallbackCDN(brand.name);
                       }}
                     />
                   </div>

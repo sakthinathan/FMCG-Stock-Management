@@ -6,7 +6,7 @@ import { supabase } from '@/lib/supabase';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { StatusBadge } from '@/components/common/StatusBadge';
 import { AlertModal } from '@/components/common/AlertModal';
-import { getBritanniaBrandImage } from '@/utils/brandImageUtils';
+import { getBritanniaBrandImage, getBritanniaFallbackCDN } from '@/utils/brandImageUtils';
 
 const W: React.CSSProperties = { background: '#fff', borderRadius: 12, boxShadow: '0 1px 3px rgba(0,0,0,0.06)' };
 
@@ -518,7 +518,7 @@ export function StockCount() {
                     alt={brandName}
                     style={{ maxHeight: 60, maxWidth: 60, objectFit: 'contain', filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.08))' }}
                     onError={(e) => {
-                      (e.currentTarget as HTMLImageElement).src = "/brands/logo.webp";
+                      (e.currentTarget as HTMLImageElement).src = getBritanniaFallbackCDN(brandName || currentProduct.material_desc);
                     }}
                   />
                 </div>
