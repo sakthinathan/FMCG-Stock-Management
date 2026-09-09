@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { PackageOpen, Building2, ArrowRight, XCircle, PackageSearch } from 'lucide-react';
+import { PackageOpen, Building2, ArrowRight, XCircle, PackageSearch, Search } from 'lucide-react';
 import { useStockStore } from '@/store/useStockStore';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
@@ -26,6 +26,10 @@ export function BrandSelection() {
   const { profile } = useAuth();
   const [brands, setBrands] = useState<BrandSummary[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Category & Search Filter States
+  const [selectedCategoryFilter, setSelectedCategoryFilter] = useState('All Brands');
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Modal States
   const [showCloseConfirm, setShowCloseConfirm] = useState(false);
@@ -158,6 +162,41 @@ export function BrandSelection() {
   }
 
   const doneCount = brands.filter(b => b.status === 'Completed').length;
+  const inProgressCount = brands.filter(b => b.status === 'In Progress').length;
+  const notStartedCount = brands.filter(b => b.status === 'Not Started').length;
+
+  const filteredBrands = brands.filter(b => {
+    // 1. Category / Status Filter
+    if (selectedCategoryFilter === 'In Progress' && b.status !== 'In Progress') return false;
+    if (selectedCategoryFilter === 'Completed' && b.status !== 'Completed') return false;
+    if (selectedCategoryFilter === 'Not Started' && b.status !== 'Not Started') return false;
+
+    if (selectedCategoryFilter === 'Biscuits & Bakery') {
+      const name = b.name.toUpperCase();
+      const isBiscuits = name.includes('BISCUIT') || name.includes('DAY') || name.includes('MARIE') || name.includes('NUTRI') || name.includes('BOURBON') || name.includes('BIKIS') || name.includes('CRACKER') || name.includes('50') || name.includes('TREAT') || name.includes('JIM') || name.includes('NICE') || name.includes('MAGIC') || name.includes('RUSK') || name.includes('TOAST') || name.includes('BAKERY');
+      if (!isBiscuits) return false;
+    }
+
+    if (selectedCategoryFilter === 'Cakes & Wafers') {
+      const name = b.name.toUpperCase();
+      const isCake = name.includes('CAKE') || name.includes('WAFER') || name.includes('ROLL') || name.includes('GOBBLE') || name.includes('BROWNIE') || name.includes('MUFFIN');
+      if (!isCake) return false;
+    }
+
+    if (selectedCategoryFilter === 'Dairy & Drinks') {
+      const name = b.name.toUpperCase();
+      const isDairy = name.includes('DAIRY') || name.includes('MILK') || name.includes('DRINK') || name.includes('COW') || name.includes('CHEES') || name.includes('BUTTER') || name.includes('GHEE') || name.includes('DAHI') || name.includes('BEVERAGE');
+      if (!isDairy) return false;
+    }
+
+    // 2. Search Query Filter
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      return b.name.toLowerCase().includes(q);
+    }
+
+    return true;
+  });
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
@@ -193,24 +232,66 @@ export function BrandSelection() {
         }
       />
 
-      {/* Britannia Category Pills */}
-      <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4, scrollbarWidth: 'none' }}>
-        {['All Brands', 'In Progress', 'Completed', 'Biscuits & Bakery', 'Dairy & Drinks'].map(cat => {
-          const active = cat === 'All Brands'; // Default active pill
-          return (
-            <button
-              key={cat}
-              className={active ? 'brit-pill-active' : 'brit-pill-inactive'}
-            >
-              {cat}
-            </button>
-          );
-        })}
+      {/* Search Bar & Category Filter Pills */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        {/* Search Box */}
+        <div style={{ position: 'relative', width: '100%', maxWidth: 380 }}>
+          <Search size={16} color="#94a3b8" style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)' }} />
+          <input
+            type="text"
+            placeholder="Filter by brand name (e.g. Good Day, Marie)..."
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            style={{
+              width: '100%', height: 42, paddingLeft: 42, paddingRight: 14,
+              borderRadius: 12, border: '1.5px solid #e2e8f0', background: '#fff',
+              color: '#0f172a', fontSize: 13, fontWeight: 600, outline: 'none',
+              fontFamily: 'inherit', boxSizing: 'border-box'
+            }}
+          />
+        </div>
+
+        {/* Britannia Category Filter Pills */}
+        <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4, scrollbarWidth: 'none' }}>
+          {[
+            { key: 'All Brands', label: `All Brands (${brands.length})` },
+            { key: 'In Progress', label: `In Progress (${inProgressCount})` },
+            { key: 'Completed', label: `Completed (${doneCount})` },
+            { key: 'Not Started', label: `Not Started (${notStartedCount})` },
+            { key: 'Biscuits & Bakery', label: `Biscuits & Bakery` },
+            { key: 'Cakes & Wafers', label: `Cakes & Wafers` },
+            { key: 'Dairy & Drinks', label: `Dairy & Drinks` },
+          ].map(cat => {
+            const active = selectedCategoryFilter === cat.key;
+            return (
+              <button
+                key={cat.key}
+                onClick={() => setSelectedCategoryFilter(cat.key)}
+                className={active ? 'brit-pill-active' : 'brit-pill-inactive'}
+              >
+                {cat.label}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(270px, 1fr))', gap: 18 }}>
-        {brands.map((brand, i) => {
+      {filteredBrands.length === 0 ? (
+        <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 16, padding: '48px 24px', textAlign: 'center' }}>
+          <PackageSearch size={36} color="#94a3b8" style={{ margin: '0 auto 12px', display: 'block' }} />
+          <h3 style={{ fontSize: 16, fontWeight: 700, color: '#0f172a', margin: '0 0 6px' }}>No Brands Found</h3>
+          <p style={{ fontSize: 13, color: '#64748b', margin: '0 0 16px' }}>No brands match your active category filter or search query.</p>
+          <button
+            onClick={() => { setSelectedCategoryFilter('All Brands'); setSearchQuery(''); }}
+            style={{ padding: '8px 18px', borderRadius: 8, border: 'none', background: '#e52321', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', textTransform: 'uppercase' }}
+          >
+            Clear Filters & Show All
+          </button>
+        </div>
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(270px, 1fr))', gap: 18 }}>
+          {filteredBrands.map((brand, i) => {
           const isDone = brand.status === 'Completed';
           const isInProgress = brand.status === 'In Progress';
 
@@ -310,7 +391,8 @@ export function BrandSelection() {
             </motion.div>
           );
         })}
-      </div>
+        </div>
+      )}
 
       {/* Confirm Close Modal */}
       <ConfirmModal
