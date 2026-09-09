@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Moon, Sun, Monitor, Trash2, AlertTriangle, Loader2, User, Shield, Settings as SettingsIcon } from 'lucide-react';
+import { Moon, Sun, Monitor, Trash2, AlertTriangle, Loader2, User, Shield, Settings as SettingsIcon, FileSpreadsheet, Layers, ListChecks, ShieldCheck, CheckCircle2, X } from 'lucide-react';
 import { useTheme } from '@/components/ThemeProvider';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
@@ -16,28 +16,59 @@ export function Settings() {
   const { clearActiveUpload } = useStockStore();
   const navigate = useNavigate();
   const [isClearing, setIsClearing] = useState(false);
-  const [showResetConfirm, setShowResetConfirm] = useState(false);
-  const [showResetPrompt, setShowResetPrompt] = useState(false);
-  const [deleteConfirmInput, setDeleteConfirmInput] = useState('');
   const [modalMessage, setModalMessage] = useState<string | null>(null);
 
-  const handleFactoryReset = () => {
-    setShowResetConfirm(true);
-  };
+  // Web App Reset Modal State & Itemized Counts
+  const [showResetModal, setShowResetModal] = useState(false);
+  const [resetCounts, setResetCounts] = useState<{ uploads: number; sessions: number; counts: number }>({
+    uploads: 0,
+    sessions: 0,
+    counts: 0,
+  });
+  const [fetchingResetCounts, setFetchingResetCounts] = useState(false);
+  const [deleteConfirmInput, setDeleteConfirmInput] = useState('');
 
-  const proceedToPrompt = () => {
-    setShowResetConfirm(false);
+  const handleFactoryReset = async () => {
+    const currentAgencyId = agency?.id || profile?.agency_id;
+    if (!currentAgencyId) return;
+
+    setFetchingResetCounts(true);
     setDeleteConfirmInput('');
-    setShowResetPrompt(true);
+    setShowResetModal(true);
+
+    try {
+      const { count: uCount } = await supabase
+        .from('stock_uploads')
+        .select('*', { count: 'exact', head: true })
+        .eq('agency_id', currentAgencyId);
+
+      const { count: sCount } = await supabase
+        .from('stock_count_sessions')
+        .select('*', { count: 'exact', head: true })
+        .eq('agency_id', currentAgencyId);
+
+      const { count: cCount } = await supabase
+        .from('physical_stock_counts')
+        .select('*', { count: 'exact', head: true });
+
+      setResetCounts({
+        uploads: uCount || 0,
+        sessions: sCount || 0,
+        counts: cCount || 0,
+      });
+    } catch (e) {
+      console.error('Error fetching reset counts:', e);
+    } finally {
+      setFetchingResetCounts(false);
+    }
   };
 
   const confirmFactoryReset = async () => {
     if (deleteConfirmInput !== 'DELETE') {
       setModalMessage("Verification word incorrect. Reset aborted.");
-      setShowResetPrompt(false);
       return;
     }
-    setShowResetPrompt(false);
+    setShowResetModal(false);
     setIsClearing(true);
     try {
       const currentAgencyId = agency?.id || profile?.agency_id;
@@ -48,7 +79,7 @@ export function Settings() {
         if (err2) throw err2;
       }
       clearActiveUpload();
-      setModalMessage(`Stock audit data for ${agency?.name || 'your agency'} (AW: ${agency?.aw_code || ''}) cleared successfully.`);
+      setModalMessage(`Stock audit data for ${agency?.name || 'your agency'} (AW: ${agency?.aw_code || ''}) reset successfully.`);
       navigate('/');
     } catch (e: any) {
       setModalMessage('Failed to reset agency audit data: ' + e.message);
@@ -295,32 +326,121 @@ export function Settings() {
         ))}
       </div>
 
-      {/* Confirmation Modals */}
-      <ConfirmModal
-        isOpen={showResetConfirm}
-        title="Reset Agency Audit Data?"
-        description={`WARNING: This will permanently delete ALL uploaded files, stock snapshots, and physical counts for ${agency?.name || 'your agency'} (AW Code: ${agency?.aw_code || ''}). Other agencies and your login credentials will NOT be affected. Are you sure?`}
-        confirmText="Yes, Proceed"
-        cancelText="Cancel"
-        isDanger={true}
-        onConfirm={proceedToPrompt}
-        onCancel={() => setShowResetConfirm(false)}
-      />
+      {/* Web App Reset Breakdown Modal */}
+      {showResetModal && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+          {/* Backdrop */}
+          <div style={{ position: 'absolute', inset: 0, background: 'rgba(15, 23, 42, 0.75)', backdropFilter: 'blur(6px)' }} onClick={() => setShowResetModal(false)} />
 
-      <ConfirmModal
-        isOpen={showResetPrompt}
-        title="Confirm Data Reset"
-        description="To confirm resetting your agency's audit data, please type DELETE in the box below:"
-        promptWord="DELETE"
-        inputValue={deleteConfirmInput}
-        onInputChange={setDeleteConfirmInput}
-        confirmText="Confirm Reset"
-        cancelText="Cancel"
-        isDanger={true}
-        onConfirm={confirmFactoryReset}
-        onCancel={() => setShowResetPrompt(false)}
-      />
+          {/* Modal Card */}
+          <div style={{
+            position: 'relative', width: '100%', maxWidth: 460, background: '#ffffff',
+            borderRadius: 24, padding: '28px 24px', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.35)',
+            border: '2px solid #fecaca', zIndex: 101, boxSizing: 'border-box'
+          }}>
+            {/* Header */}
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ width: 44, height: 44, borderRadius: 12, background: '#fef2f2', border: '1px solid #fca5a5', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#dc2626' }}>
+                  <Trash2 size={22} />
+                </div>
+                <div>
+                  <h3 style={{ fontSize: 18, fontWeight: 800, color: '#0f172a', margin: '0 0 2px', textTransform: 'uppercase' }}>Reset Agency Stock Data</h3>
+                  <p style={{ fontSize: 12, color: '#e52321', margin: 0, fontWeight: 700 }}>
+                    AW Code: {agency?.aw_code} · {agency?.name}
+                  </p>
+                </div>
+              </div>
+              <button onClick={() => setShowResetModal(false)} style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#94a3b8', padding: 4, display: 'flex' }}>
+                <X size={20} />
+              </button>
+            </div>
 
+            <p style={{ fontSize: 13, color: '#64748b', margin: '0 0 16px', lineHeight: 1.5 }}>
+              This action will reset your stock audit cycle. Below is the exact breakdown of data that will be modified for your AW Code:
+            </p>
+
+            {/* WILL BE DELETED SECTION */}
+            <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 14, padding: '14px 16px', marginBottom: 14 }}>
+              <p style={{ fontSize: 11, fontWeight: 800, color: '#b91c1c', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 10px', display: 'flex', alignItems: 'center', gap: 6 }}>
+                <AlertTriangle size={14} color="#b91c1c" /> WILL BE PERMANENTLY DELETED:
+              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 12, color: '#7f1d1d', fontWeight: 600 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><FileSpreadsheet size={14} color="#dc2626" /> Uploaded Excel Stock Files</span>
+                  <span style={{ fontWeight: 800, background: '#fee2e2', padding: '2px 8px', borderRadius: 6 }}>{fetchingResetCounts ? '...' : `${resetCounts.uploads} Files`}</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><Layers size={14} color="#dc2626" /> Audit Counting Sessions</span>
+                  <span style={{ fontWeight: 800, background: '#fee2e2', padding: '2px 8px', borderRadius: 6 }}>{fetchingResetCounts ? '...' : `${resetCounts.sessions} Sessions`}</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><ListChecks size={14} color="#dc2626" /> Physical SKU Counts & Variances</span>
+                  <span style={{ fontWeight: 800, background: '#fee2e2', padding: '2px 8px', borderRadius: 6 }}>{fetchingResetCounts ? '...' : `${resetCounts.counts} Records`}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* WILL NOT BE TOUCHED SECTION */}
+            <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 14, padding: '14px 16px', marginBottom: 18 }}>
+              <p style={{ fontSize: 11, fontWeight: 800, color: '#15803d', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 8px', display: 'flex', alignItems: 'center', gap: 6 }}>
+                <ShieldCheck size={14} color="#15803d" /> SAFE & UNTOUCHED:
+              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 12, color: '#166534', fontWeight: 600 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}><CheckCircle2 size={13} color="#16a34a" /> Agency AW Code ({agency?.aw_code}) & Login Password</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}><CheckCircle2 size={13} color="#16a34a" /> Distributor Profile ({agency?.name}, District & Mobile)</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}><CheckCircle2 size={13} color="#16a34a" /> Other Agency Multi-Tenant Accounts</div>
+              </div>
+            </div>
+
+            {/* Type DELETE to Confirm */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 20 }}>
+              <label style={{ fontSize: 11, fontWeight: 700, color: '#475569', textTransform: 'uppercase' }}>
+                Type <strong>DELETE</strong> to confirm destruction:
+              </label>
+              <input
+                type="text"
+                value={deleteConfirmInput}
+                onChange={e => setDeleteConfirmInput(e.target.value)}
+                placeholder="DELETE"
+                autoFocus
+                style={{
+                  width: '100%', height: 42, padding: '0 12px', border: '1.5px solid #e2e8f0',
+                  borderRadius: 10, fontSize: 14, fontWeight: 700, color: '#0f172a',
+                  outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box'
+                }}
+              />
+            </div>
+
+            {/* Action Buttons */}
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button
+                type="button"
+                onClick={() => setShowResetModal(false)}
+                style={{ flex: 1, height: 44, background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: 10, color: '#475569', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={confirmFactoryReset}
+                disabled={deleteConfirmInput !== 'DELETE' || isClearing}
+                style={{
+                  flex: 1, height: 44,
+                  background: deleteConfirmInput === 'DELETE' && !isClearing ? '#dc2626' : '#fca5a5',
+                  border: 'none', borderRadius: 10, color: '#fff', fontSize: 13, fontWeight: 700,
+                  cursor: deleteConfirmInput === 'DELETE' && !isClearing ? 'pointer' : 'not-allowed',
+                  fontFamily: 'inherit', textTransform: 'uppercase', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6
+                }}
+              >
+                {isClearing ? <><Loader2 size={15} style={{ animation: 'spin 1s linear infinite' }} /> Resetting...</> : 'Confirm Reset'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Notification Modal */}
       <ConfirmModal
         isOpen={!!modalMessage}
         title="Notification"
