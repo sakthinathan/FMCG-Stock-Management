@@ -45,6 +45,7 @@ export function StockCount() {
   const [saving, setSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [mobileListOpen, setMobileListOpen] = useState(false);
+  const [showCompletionModal, setShowCompletionModal] = useState(false);
 
   // Input refs for seamless mobile keyboard navigation
   const cbbInputRef = useRef<HTMLInputElement>(null);
@@ -321,8 +322,7 @@ export function StockCount() {
           .update({ status: 'Completed' })
           .eq('id', sessionId);
         if (completeErr) throw completeErr;
-        alert('Audit session completed!');
-        navigate('/brands');
+        setShowCompletionModal(true);
       } catch (e: any) {
         console.error(e);
         alert('Failed to complete session: ' + (e.message || JSON.stringify(e)));
@@ -673,6 +673,85 @@ export function StockCount() {
         </div>
       </div>
 
+      {/* Completion Web App Modal */}
+      {showCompletionModal && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 9999,
+          background: 'rgba(15, 23, 42, 0.75)', backdropFilter: 'blur(6px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20
+        }}>
+          <div style={{
+            background: '#ffffff', borderRadius: 20, width: '100%', maxWidth: 440,
+            padding: '28px 24px', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+            textAlign: 'center', border: '1px solid #e2e8f0', animation: 'scaleIn 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
+          }}>
+            <div style={{
+              width: 64, height: 64, borderRadius: '50%', background: '#dcfce7', color: '#16a34a',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px'
+            }}>
+              <CheckCircle2 size={36} />
+            </div>
+
+            <h3 style={{ fontSize: 20, fontWeight: 800, color: '#0f172a', margin: '0 0 6px' }}>
+              Audit Session Completed! 🎉
+            </h3>
+            
+            <p style={{ fontSize: 13, color: '#64748b', margin: '0 0 20px', lineHeight: 1.5 }}>
+              Stock counting for <strong style={{ color: '#0f172a' }}>{brandName}</strong> has been successfully finalized and saved.
+            </p>
+
+            <div style={{
+              background: '#f8fafc', borderRadius: 12, padding: '14px 16px', margin: '0 0 24px',
+              border: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-around', textAlign: 'center'
+            }}>
+              <div>
+                <div style={{ fontSize: 18, fontWeight: 800, color: '#0f172a' }}>{allProducts.length}</div>
+                <div style={{ fontSize: 11, fontWeight: 600, color: '#64748b', marginTop: 2 }}>Total SKUs</div>
+              </div>
+              <div style={{ width: 1, background: '#e2e8f0' }} />
+              <div>
+                <div style={{ fontSize: 18, fontWeight: 800, color: '#16a34a' }}>
+                  {allProducts.filter(p => p.existingCbb !== '' || p.existingPcs !== '').length}
+                </div>
+                <div style={{ fontSize: 11, fontWeight: 600, color: '#64748b', marginTop: 2 }}>Counted</div>
+              </div>
+              <div style={{ width: 1, background: '#e2e8f0' }} />
+              <div>
+                <div style={{ fontSize: 18, fontWeight: 800, color: '#dc2626' }}>
+                  {allProducts.filter(p => p.existingVariance && p.existingVariance !== 0).length}
+                </div>
+                <div style={{ fontSize: 11, fontWeight: 600, color: '#64748b', marginTop: 2 }}>Variances</div>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <button
+                onClick={() => navigate('/brands')}
+                style={{
+                  width: '100%', height: 44, background: '#e52321', color: '#fff',
+                  border: 'none', borderRadius: 10, fontSize: 14, fontWeight: 700,
+                  cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center',
+                  justifyContent: 'center', gap: 8, boxShadow: '0 4px 12px rgba(229,35,33,0.25)',
+                  textTransform: 'uppercase', letterSpacing: '0.02em'
+                }}
+              >
+                Return to Brand Selection
+              </button>
+              <button
+                onClick={() => setShowCompletionModal(false)}
+                style={{
+                  width: '100%', height: 38, background: 'transparent', color: '#64748b',
+                  border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600,
+                  cursor: 'pointer', fontFamily: 'inherit'
+                }}
+              >
+                Review Current Counts
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <style>{`
         .stock-count-layout { display: flex; }
         @media (min-width: 1024px) {
@@ -684,6 +763,7 @@ export function StockCount() {
           .mobile-list-toggle-btn { display: inline-block !important; }
         }
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        @keyframes scaleIn { from { transform: scale(0.95); opacity: 0; } to { transform: scale(1); opacity: 1; } }
       `}</style>
     </div>
   );
