@@ -12,7 +12,7 @@ const W: React.CSSProperties = { background: '#fff', borderRadius: 12, boxShadow
 
 export function Settings() {
   const { theme, setTheme } = useTheme();
-  const { user, agency } = useAuth();
+  const { user, agency, profile } = useAuth();
   const { clearActiveUpload } = useStockStore();
   const navigate = useNavigate();
   const [isClearing, setIsClearing] = useState(false);
@@ -33,20 +33,25 @@ export function Settings() {
 
   const confirmFactoryReset = async () => {
     if (deleteConfirmInput !== 'DELETE') {
-      setModalMessage("Verification word incorrect. Factory reset aborted.");
+      setModalMessage("Verification word incorrect. Reset aborted.");
       setShowResetPrompt(false);
       return;
     }
     setShowResetPrompt(false);
     setIsClearing(true);
     try {
-      const { error } = await supabase.from('stock_uploads').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-      if (error) throw error;
+      const currentAgencyId = agency?.id || profile?.agency_id;
+      if (currentAgencyId) {
+        const { error: err1 } = await supabase.from('stock_uploads').delete().eq('agency_id', currentAgencyId);
+        if (err1) throw err1;
+        const { error: err2 } = await supabase.from('stock_count_sessions').delete().eq('agency_id', currentAgencyId);
+        if (err2) throw err2;
+      }
       clearActiveUpload();
-      setModalMessage('Database cleared successfully.');
+      setModalMessage(`Stock audit data for ${agency?.name || 'your agency'} (AW: ${agency?.aw_code || ''}) cleared successfully.`);
       navigate('/');
     } catch (e: any) {
-      setModalMessage('Failed: ' + e.message);
+      setModalMessage('Failed to reset agency audit data: ' + e.message);
     } finally {
       setIsClearing(false);
     }
@@ -240,9 +245,9 @@ export function Settings() {
         </div>
         <div style={{ padding: '20px 22px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
           <div>
-            <h3 style={{ fontSize: 14, fontWeight: 700, color: '#0f172a', margin: '0 0 4px' }}>Factory Reset Database</h3>
+            <h3 style={{ fontSize: 14, fontWeight: 700, color: '#0f172a', margin: '0 0 4px' }}>Reset Agency Stock Audit Data</h3>
             <p style={{ fontSize: 13, color: '#64748b', margin: 0, maxWidth: 480 }}>
-              Permanently deletes all uploaded files, stock snapshots, and physical counts from Supabase. Use only when starting a completely new audit cycle.
+              Permanently deletes uploaded files, stock snapshots, and physical counts belonging ONLY to your agency ({agency?.name || 'Your Agency'} · AW: {agency?.aw_code || 'N/A'}). Other agency accounts and your login credentials remain untouched.
             </p>
           </div>
           <button
@@ -265,9 +270,9 @@ export function Settings() {
             }}
           >
             {isClearing ? (
-              <><Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> Clearing...</>
+              <><Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> Resetting...</>
             ) : (
-              <><Trash2 size={14} /> Clear Entire Database</>
+              <><Trash2 size={14} /> Reset Agency Audit Data</>
             )}
           </button>
         </div>
@@ -293,8 +298,8 @@ export function Settings() {
       {/* Confirmation Modals */}
       <ConfirmModal
         isOpen={showResetConfirm}
-        title="Factory Reset Database?"
-        description="WARNING: This will permanently delete ALL stock uploads, snapshots, and counts. This cannot be undone. Are you sure you want to proceed?"
+        title="Reset Agency Audit Data?"
+        description={`WARNING: This will permanently delete ALL uploaded files, stock snapshots, and physical counts for ${agency?.name || 'your agency'} (AW Code: ${agency?.aw_code || ''}). Other agencies and your login credentials will NOT be affected. Are you sure?`}
         confirmText="Yes, Proceed"
         cancelText="Cancel"
         isDanger={true}
@@ -304,8 +309,8 @@ export function Settings() {
 
       <ConfirmModal
         isOpen={showResetPrompt}
-        title="Confirm Destruction"
-        description="To confirm factory reset, please type DELETE in the box below:"
+        title="Confirm Data Reset"
+        description="To confirm resetting your agency's audit data, please type DELETE in the box below:"
         promptWord="DELETE"
         inputValue={deleteConfirmInput}
         onInputChange={setDeleteConfirmInput}
