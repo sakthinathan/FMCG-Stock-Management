@@ -248,7 +248,12 @@ export function Reports() {
 
   const fetchReportData = async (type: ReportType) => {
     if (!selectedUploadId) return null;
-    const { data: snapshots } = await supabase.from('system_stock_snapshots').select('*').eq('upload_id', selectedUploadId);
+    const { data: snapshots } = await supabase
+      .from('system_stock_snapshots')
+      .select('*')
+      .eq('upload_id', selectedUploadId)
+      .order('brand', { ascending: true })
+      .order('material', { ascending: true });
     const { data: counts } = await supabase.from('physical_stock_counts').select('*');
     
     const countMap = new Map();
