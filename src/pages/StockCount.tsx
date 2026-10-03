@@ -7,6 +7,7 @@ import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { StatusBadge } from '@/components/common/StatusBadge';
 import { AlertModal } from '@/components/common/AlertModal';
 import { getBritanniaBrandImage, getBritanniaFallbackCDN } from '@/utils/brandImageUtils';
+import { formatCbbPcs } from '@/lib/cbbUtils';
 
 const W: React.CSSProperties = { background: '#fff', borderRadius: 12, boxShadow: '0 1px 3px rgba(0,0,0,0.06)' };
 
@@ -420,7 +421,11 @@ export function StockCount() {
                         }}>
                           ₹{p.mrp}
                         </span>
-                        {isCounted && <span>{p.existingStatus}</span>}
+                        {isCounted && (
+                          <span style={{ fontSize: 9, fontWeight: 700, color: sc.color }}>
+                            {p.existingStatus} {p.existingVariance !== null && p.existingVariance !== 0 ? `(${formatCbbPcs(p.existingVariance, p.conversion, true)})` : ''}
+                          </span>
+                        )}
                       </div>
                     </div>
                     <p style={{ fontSize: 11, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.material_desc}</p>
@@ -500,7 +505,11 @@ export function StockCount() {
                         }}>
                           ₹{p.mrp}
                         </span>
-                        {isCounted && <span style={{ fontSize: 9, fontWeight: 800, color: sc.color }}>{p.existingStatus}</span>}
+                        {isCounted && (
+                          <span style={{ fontSize: 9, fontWeight: 800, color: sc.color }}>
+                            {p.existingStatus} {p.existingVariance !== null && p.existingVariance !== 0 ? `(${formatCbbPcs(p.existingVariance, p.conversion, true)})` : ''}
+                          </span>
+                        )}
                       </div>
                     </div>
                     <p style={{ fontSize: 12, fontWeight: active ? 600 : 500, color: '#1e293b', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -698,7 +707,7 @@ export function StockCount() {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #f1f5f9', paddingTop: 8, marginTop: 2 }}>
                   <span style={{ fontSize: 12, color: '#64748b', fontWeight: 500 }}>Previous Audit Variance</span>
                   <span style={{ fontSize: 13, fontWeight: 700, color: (currentProduct.prev_variance || 0) < 0 ? '#dc2626' : (currentProduct.prev_variance || 0) > 0 ? '#d97706' : '#16a34a' }}>
-                    {(currentProduct.prev_variance || 0) > 0 ? '+' : ''}{currentProduct.prev_variance || 0} PCS
+                    {formatCbbPcs(currentProduct.prev_variance || 0, currentProduct.conversion, true)} ({currentProduct.prev_variance || 0} PCS)
                   </span>
                 </div>
 
@@ -711,7 +720,7 @@ export function StockCount() {
                     }}>
                       {liveVariance === (currentProduct.prev_variance || 0)
                         ? 'Matches Previous Variance ✓'
-                        : `Variance Changed (Delta: ${liveVariance - (currentProduct.prev_variance || 0) > 0 ? '+' : ''}${liveVariance - (currentProduct.prev_variance || 0)} PCS)`}
+                        : `Delta: ${formatCbbPcs(liveVariance - (currentProduct.prev_variance || 0), currentProduct.conversion, true)} (${liveVariance - (currentProduct.prev_variance || 0) > 0 ? '+' : ''}${liveVariance - (currentProduct.prev_variance || 0)} PCS)`}
                     </span>
                   </div>
                 )}
@@ -719,23 +728,27 @@ export function StockCount() {
                 {/* Variance message banner */}
                 {hasInput && liveVariance !== null && (
                   <div style={{
-                    marginTop: 4, padding: '10px 14px', borderRadius: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                    marginTop: 4, padding: '12px 16px', borderRadius: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                     background: liveStatus === 'Equal' ? '#f0fdf4' : liveStatus === 'Shortage' ? '#fef2f2' : '#fffbeb',
-                    border: `1px solid ${liveStatus === 'Equal' ? '#bbf7d0' : liveStatus === 'Shortage' ? '#fecaca' : '#fde68a'}`,
+                    border: `1.5px solid ${liveStatus === 'Equal' ? '#bbf7d0' : liveStatus === 'Shortage' ? '#fecaca' : '#fde68a'}`,
                     color: liveStatus === 'Equal' ? '#16a34a' : liveStatus === 'Shortage' ? '#dc2626' : '#d97706',
                   }}>
                     <div>
-                      <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', margin: 0 }}>{liveStatus}</p>
-                      <p style={{ fontSize: 18, fontWeight: 800, margin: 0 }}>{Math.abs(liveVariance)} PCS</p>
+                      <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', margin: 0, letterSpacing: '0.04em' }}>
+                        {liveStatus === 'Equal' ? 'Audit Matched' : liveStatus === 'Shortage' ? 'Shortage Difference' : 'Excess Difference'}
+                      </p>
+                      <p style={{ fontSize: 20, fontWeight: 800, margin: '2px 0 0' }}>
+                        {liveStatus === 'Equal'
+                          ? '0 CBB + 0 PCS'
+                          : formatCbbPcs(liveVariance, currentProduct.conversion, true)}
+                      </p>
                     </div>
-                    {liveStatus !== 'Equal' && currentProduct.conversion > 1 && (
-                      <div style={{ textAlign: 'right' }}>
-                        <p style={{ fontSize: 10, fontWeight: 600, margin: 0, opacity: 0.8 }}>Case Breakdown</p>
-                        <p style={{ fontSize: 13, fontWeight: 700, margin: 0 }}>
-                          {Math.floor(Math.abs(liveVariance) / currentProduct.conversion)} CBB + {Math.abs(liveVariance) % currentProduct.conversion} PCS
-                        </p>
-                      </div>
-                    )}
+                    <div style={{ textAlign: 'right' }}>
+                      <p style={{ fontSize: 10, fontWeight: 600, margin: 0, opacity: 0.8 }}>Difference In Pieces</p>
+                      <p style={{ fontSize: 14, fontWeight: 800, margin: 0 }}>
+                        {liveVariance > 0 ? '+' : ''}{liveVariance} PCS
+                      </p>
+                    </div>
                   </div>
                 )}
               </div>

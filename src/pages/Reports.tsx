@@ -3,7 +3,7 @@ import {
   FileSpreadsheet, Download, FileText, History,
   Building2, Layers, Calendar, Search, X,
   AlertTriangle, AlertCircle, TrendingUp, TrendingDown,
-  CheckCircle2, RefreshCw
+  CheckCircle2
 } from 'lucide-react';
 import { useStockStore } from '@/store/useStockStore';
 import { supabase } from '@/lib/supabase';
@@ -13,13 +13,20 @@ import { StatusBadge } from '@/components/common/StatusBadge';
 import { AlertModal } from '@/components/common/AlertModal';
 import { exportDataToExcel, exportReportToPdf, type ReportType } from '@/lib/reportExportUtils';
 import { useAuth } from '@/contexts/AuthContext';
+import { calculateCbbPcs, formatCbbPcs } from '@/lib/cbbUtils';
 
 interface BrandSummaryItem {
   brand: string;
   totalSkus: number;
   countedSkus: number;
+  systemCbb: number;
+  systemLoosePcs: number;
   systemQtyPcs: number;
+  physicalCbb: number;
+  physicalLoosePcs: number;
   physicalQtyPcs: number;
+  netVarCbb: number;
+  netVarLoosePcs: number;
   netVariancePcs: number;
   shortageCount: number;
   excessCount: number;
@@ -172,6 +179,7 @@ export function Reports() {
             const countB = snapB ? countMapB.get(snapB.id) : null;
 
             const mrp = Number(snapA.mrp) || 0;
+            const conv = Number(snapA.conversion) > 0 ? Number(snapA.conversion) : 1;
             const sysA = Number(snapA.system_qty_pcs) || 0;
             const phyA = countA ? Number(countA.physical_total_pcs) || 0 : 0;
             const varA = countA ? Number(countA.variance) || 0 : 0;
@@ -185,6 +193,7 @@ export function Reports() {
               description: snapA.material_desc,
               brand: snapA.brand,
               mrp,
+              conversion: conv,
               sysA, phyA, varA,
               sysB, phyB, varB,
               deltaCount: phyB - phyA,
@@ -203,7 +212,7 @@ export function Reports() {
     loadData();
   }, [selectedUploadId, compareUploadId, compareMode, selectedSessionId, selectedBrand]);
 
-  // 4. Compute Counts & Aggregates
+  // 4. Compute Counts & Aggregates (Including CBB & PCS exact decomposition)
   const { countMap, brandSummaries, overallStats, categoryCounts } = useMemo(() => {
     const cMap = new Map();
     if (selectedSessionId !== 'All') {
@@ -215,8 +224,19 @@ export function Reports() {
     const bMap = new Map<string, BrandSummaryItem>();
     let totalSysQty = 0;
     let totalPhyQty = 0;
+    let totalSysCbb = 0;
+    let totalSysLoosePcs = 0;
+    let totalPhyCbb = 0;
+    let totalPhyLoosePcs = 0;
+
     let totalShortageQty = 0;
+    let totalShortageCbb = 0;
+    let totalShortageLoosePcs = 0;
+
     let totalExcessQty = 0;
+    let totalExcessCbb = 0;
+    let totalExcessLoosePcs = 0;
+
     let totalShortageCount = 0;
     let totalExcessCount = 0;
     let totalCounted = 0;
@@ -225,13 +245,21 @@ export function Reports() {
 
     rawSnapshots.forEach(snap => {
       const b = snap.brand || 'Unbranded';
+      const conv = Number(snap.conversion) > 0 ? Number(snap.conversion) : 1;
+
       if (!bMap.has(b)) {
         bMap.set(b, {
           brand: b,
           totalSkus: 0,
           countedSkus: 0,
+          systemCbb: 0,
+          systemLoosePcs: 0,
           systemQtyPcs: 0,
+          physicalCbb: 0,
+          physicalLoosePcs: 0,
           physicalQtyPcs: 0,
+          netVarCbb: 0,
+          netVarLoosePcs: 0,
           netVariancePcs: 0,
           shortageCount: 0,
           excessCount: 0,
@@ -241,29 +269,57 @@ export function Reports() {
       const entry = bMap.get(b)!;
       entry.totalSkus++;
       const sysPcs = Number(snap.system_qty_pcs) || 0;
+      const skuSysCbb = Math.floor(sysPcs / conv);
+      const skuSysLoose = sysPcs % conv;
+
       entry.systemQtyPcs += sysPcs;
+      entry.systemCbb += skuSysCbb;
+      entry.systemLoosePcs += skuSysLoose;
+
       totalSysQty += sysPcs;
+      totalSysCbb += skuSysCbb;
+      totalSysLoosePcs += skuSysLoose;
 
       const count = cMap.get(snap.id);
       if (count) {
         entry.countedSkus++;
         totalCounted++;
         const phyPcs = Number(count.physical_total_pcs) || 0;
+        const skuPhyCbb = Math.floor(phyPcs / conv);
+        const skuPhyLoose = phyPcs % conv;
+
         const variance = Number(count.variance) || 0;
         const prevVariance = Number(snap.prev_variance) || 0;
 
         entry.physicalQtyPcs += phyPcs;
+        entry.physicalCbb += skuPhyCbb;
+        entry.physicalLoosePcs += skuPhyLoose;
+
         totalPhyQty += phyPcs;
+        totalPhyCbb += skuPhyCbb;
+        totalPhyLoosePcs += skuPhyLoose;
+
         entry.netVariancePcs += variance;
 
         if (variance < 0) {
+          const absVar = Math.abs(variance);
+          const sCbb = Math.floor(absVar / conv);
+          const sLoose = absVar % conv;
+
           entry.shortageCount++;
           totalShortageCount++;
-          totalShortageQty += Math.abs(variance);
+          totalShortageQty += absVar;
+          totalShortageCbb += sCbb;
+          totalShortageLoosePcs += sLoose;
         } else if (variance > 0) {
+          const eCbb = Math.floor(variance / conv);
+          const eLoose = variance % conv;
+
           entry.excessCount++;
           totalExcessCount++;
           totalExcessQty += variance;
+          totalExcessCbb += eCbb;
+          totalExcessLoosePcs += eLoose;
         } else if (variance === 0 && prevVariance !== 0) {
           entry.resolvedCount++;
         }
@@ -277,7 +333,14 @@ export function Reports() {
       }
     });
 
-    const bList = Array.from(bMap.values()).sort((a, b) => b.systemQtyPcs - a.systemQtyPcs);
+    const bList = Array.from(bMap.values()).map(b => {
+      const netAbs = Math.abs(b.netVariancePcs);
+      return {
+        ...b,
+        netVarCbb: Math.abs(b.physicalCbb - b.systemCbb),
+        netVarLoosePcs: Math.abs(b.physicalLoosePcs - b.systemLoosePcs),
+      };
+    }).sort((a, b) => b.systemQtyPcs - a.systemQtyPcs);
 
     return {
       countMap: cMap,
@@ -285,13 +348,23 @@ export function Reports() {
       overallStats: {
         totalSkus: rawSnapshots.length,
         countedSkus: totalCounted,
+        systemCbb: totalSysCbb,
+        systemLoosePcs: totalSysLoosePcs,
         systemQtyPcs: totalSysQty,
+        physicalCbb: totalPhyCbb,
+        physicalLoosePcs: totalPhyLoosePcs,
         physicalQtyPcs: totalPhyQty,
+        shortageCbb: totalShortageCbb,
+        shortageLoosePcs: totalShortageLoosePcs,
+        shortageQtyPcs: totalShortageQty,
+        excessCbb: totalExcessCbb,
+        excessLoosePcs: totalExcessLoosePcs,
+        excessQtyPcs: totalExcessQty,
+        netVarCbb: Math.abs(totalPhyCbb - totalSysCbb),
+        netVarLoosePcs: Math.abs(totalPhyLoosePcs - totalSysLoosePcs),
         netVariancePcs: totalPhyQty - totalSysQty,
         shortageItems: totalShortageCount,
         excessItems: totalExcessCount,
-        shortageQtyPcs: totalShortageQty,
-        excessQtyPcs: totalExcessQty,
       },
       categoryCounts: {
         full: rawSnapshots.length,
@@ -305,7 +378,7 @@ export function Reports() {
     };
   }, [rawSnapshots, rawCounts, selectedSessionId, comparisonRows.length]);
 
-  // 5. Generate active report records
+  // 5. Generate active report records (All system, physical, and difference values formatted as CBB & PCS)
   const activeReportRows = useMemo(() => {
     if (activeReportType === 'brand_summary') {
       return brandSummaries
@@ -315,8 +388,11 @@ export function Reports() {
           'Total SKUs': b.totalSkus,
           'Counted SKUs': b.countedSkus,
           'Progress %': b.totalSkus > 0 ? `${((b.countedSkus / b.totalSkus) * 100).toFixed(1)}%` : '0%',
+          'System Stock (CBB & PCS)': `${b.systemCbb} CBB + ${b.systemLoosePcs} PCS`,
           'System Qty (PCS)': b.systemQtyPcs,
+          'Physical Stock (CBB & PCS)': `${b.physicalCbb} CBB + ${b.physicalLoosePcs} PCS`,
           'Physical Qty (PCS)': b.physicalQtyPcs,
+          'Net Difference (CBB & PCS)': `${b.netVariancePcs < 0 ? '-' : b.netVariancePcs > 0 ? '+' : ''}${b.netVarCbb} CBB ${b.netVariancePcs < 0 ? '-' : b.netVariancePcs > 0 ? '+' : ''}${b.netVarLoosePcs} PCS`,
           'Net Variance (PCS)': b.netVariancePcs,
           'Shortage Count': b.shortageCount,
           'Excess Count': b.excessCount,
@@ -325,19 +401,25 @@ export function Reports() {
     }
 
     if (activeReportType === 'historical_comparison') {
-      return comparisonRows.map(r => ({
-        'Material': r.material,
-        'Description': r.description,
-        'Brand': r.brand,
-        'MRP (₹)': r.mrp,
-        'Upload A Sys (PCS)': r.sysA,
-        'Upload A Phy (PCS)': r.phyA,
-        'Upload A Var (PCS)': r.varA,
-        'Upload B Sys (PCS)': r.sysB,
-        'Upload B Phy (PCS)': r.phyB,
-        'Upload B Var (PCS)': r.varB,
-        'Delta Count (PCS)': r.deltaCount,
-      }));
+      return comparisonRows.map(r => {
+        const conv = r.conversion || 1;
+        const diffBreakdown = calculateCbbPcs(r.deltaCount, conv, true);
+        return {
+          'Material': r.material,
+          'Description': r.description,
+          'Brand': r.brand,
+          'MRP (₹)': r.mrp,
+          'Case Size (1 CBB)': `${conv} PCS`,
+          'Upload A Sys (PCS)': r.sysA,
+          'Upload A Phy (PCS)': r.phyA,
+          'Upload A Var (PCS)': r.varA,
+          'Upload B Sys (PCS)': r.sysB,
+          'Upload B Phy (PCS)': r.phyB,
+          'Upload B Var (PCS)': r.varB,
+          'Delta Difference (CBB & PCS)': diffBreakdown.formatted,
+          'Delta Count (PCS)': r.deltaCount,
+        };
+      });
     }
 
     const rows: any[] = [];
@@ -345,11 +427,17 @@ export function Reports() {
       if (selectedBrand !== 'All Brands' && snap.brand !== selectedBrand) return;
       const count = countMap.get(snap.id);
       const mrp = Number(snap.mrp) || 0;
+      const conv = Number(snap.conversion) > 0 ? Number(snap.conversion) : 1;
       const sysPcs = Number(snap.system_qty_pcs) || 0;
       const phyPcs = count ? Number(count.physical_total_pcs) || 0 : null;
       const variance = count ? Number(count.variance) || 0 : null;
       const prevVariance = Number(snap.prev_variance) || 0;
       const status = count ? count.status : 'Not Counted';
+
+      const sysBreakdown = calculateCbbPcs(sysPcs, conv, false);
+      const phyBreakdown = count ? calculateCbbPcs(phyPcs, conv, false) : null;
+      const varBreakdown = count ? calculateCbbPcs(variance, conv, true) : null;
+      const prevVarBreakdown = calculateCbbPcs(prevVariance, conv, true);
 
       let trend = 'No Change';
       if (count && variance !== null) {
@@ -364,12 +452,17 @@ export function Reports() {
         'Description': snap.material_desc,
         'Brand': snap.brand,
         'MRP (₹)': mrp,
+        'Case Size (1 CBB)': `${conv} PCS`,
+        'System Stock (CBB & PCS)': sysBreakdown.formatted,
         'System Qty (PCS)': sysPcs,
+        'Physical Stock (CBB & PCS)': phyBreakdown ? phyBreakdown.formatted : 'Not Counted',
         'Physical Qty (PCS)': count ? phyPcs : 'Not Counted',
+        'Difference (CBB & PCS)': varBreakdown ? varBreakdown.formatted : '',
         'Variance (PCS)': count ? variance : '',
         'Status': status,
         'Reason Code': count?.reason_code || '',
         'Notes': count?.notes || '',
+        'Previous Variance (CBB & PCS)': prevVarBreakdown.formatted,
         'Previous Variance (PCS)': prevVariance,
         'Trend': trend,
       };
@@ -458,7 +551,7 @@ export function Reports() {
     full: {
       title: 'Full Audit',
       subtitle: 'Complete SKU inventory snapshot',
-      desc: 'Itemized inventory list of all materials with physical counts, recorded system quantities, and calculated variances.',
+      desc: 'Itemized inventory list of all materials with physical counts, recorded system quantities, and calculated variances in CBB and PCS.',
       pdfTitle: 'Comprehensive Stock Audit Report',
       icon: FileText,
       color: '#4f46e5',
@@ -469,7 +562,7 @@ export function Reports() {
     shortage: {
       title: 'Shortages',
       subtitle: 'Physical < System stock',
-      desc: 'All materials where physical count is lower than master book stock, requiring investigation or shortage claims.',
+      desc: 'All materials where physical count is lower than master book stock, displayed as Cases (CBB) and loose pieces (PCS).',
       pdfTitle: 'Stock Shortage Discrepancy Report',
       icon: AlertTriangle,
       color: '#dc2626',
@@ -480,7 +573,7 @@ export function Reports() {
     excess: {
       title: 'Excess Surplus',
       subtitle: 'Physical > System stock',
-      desc: 'Materials with verified physical inventory exceeding system records, requiring receipt reconciliation or stock adjustments.',
+      desc: 'Materials with verified physical inventory exceeding system records, displayed as Cases (CBB) and loose pieces (PCS).',
       pdfTitle: 'Stock Excess Surplus Report',
       icon: TrendingUp,
       color: '#d97706',
@@ -491,7 +584,7 @@ export function Reports() {
     brand_summary: {
       title: 'Brand Breakdown',
       subtitle: 'Category progress & totals',
-      desc: 'Executive summary grouped by brand category showing total SKUs, audit completion progress, and net quantity variances.',
+      desc: 'Executive summary grouped by brand category showing total SKUs, audit completion progress, and net CBB/PCS variances.',
       pdfTitle: 'Brand Category Stock Summary Report',
       icon: Building2,
       color: '#059669',
@@ -545,7 +638,7 @@ export function Reports() {
       {/* 1. Header */}
       <PageHeader
         title="Stock Audit Reports & Export Hub"
-        description="Unified analytics hub: preview discrepancies in real-time, filter SKUs, and export verified Excel (.xlsx) or PDF reports"
+        description="Unified analytics hub: preview discrepancies in real-time, inspect CBB and PCS quantities, and export verified Excel or PDF reports"
         icon={FileSpreadsheet}
         actions={
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -707,18 +800,43 @@ export function Reports() {
         </div>
       )}
 
-      {/* 3. Executive KPI Cards (Quantities Only) */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 14 }}>
+      {/* 3. Executive KPI Cards (CBB & PCS Operational Quantities) */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: 14 }}>
         {[
-          { label: 'Total SKUs', value: overallStats.totalSkus, sub: `${overallStats.countedSkus} Counted`, color: '#4f46e5' },
-          { label: 'System Stock', value: `${overallStats.systemQtyPcs.toLocaleString('en-IN')} PCS`, sub: 'Master Book Quantity', color: '#64748b' },
-          { label: 'Physical Stock', value: `${overallStats.physicalQtyPcs.toLocaleString('en-IN')} PCS`, sub: 'Audited Physical Count', color: '#10b981' },
-          { label: 'Shortage Qty', value: `${overallStats.shortageQtyPcs.toLocaleString('en-IN')} PCS`, sub: `${overallStats.shortageItems} SKUs Short`, color: '#ef4444' },
-          { label: 'Excess Qty', value: `${overallStats.excessQtyPcs.toLocaleString('en-IN')} PCS`, sub: `${overallStats.excessItems} SKUs Excess`, color: '#f59e0b' },
+          {
+            label: 'Total SKUs',
+            value: overallStats.totalSkus,
+            sub: `${overallStats.countedSkus} Counted in Session`,
+            color: '#4f46e5',
+          },
+          {
+            label: 'System Book Stock',
+            value: `${overallStats.systemCbb.toLocaleString('en-IN')} CBB + ${overallStats.systemLoosePcs.toLocaleString('en-IN')} PCS`,
+            sub: `${overallStats.systemQtyPcs.toLocaleString('en-IN')} PCS Total Book Stock`,
+            color: '#64748b',
+          },
+          {
+            label: 'Physical Audited Stock',
+            value: `${overallStats.physicalCbb.toLocaleString('en-IN')} CBB + ${overallStats.physicalLoosePcs.toLocaleString('en-IN')} PCS`,
+            sub: `${overallStats.physicalQtyPcs.toLocaleString('en-IN')} PCS Total Audited`,
+            color: '#10b981',
+          },
+          {
+            label: 'Shortage Discrepancy',
+            value: `${overallStats.shortageCbb.toLocaleString('en-IN')} CBB + ${overallStats.shortageLoosePcs.toLocaleString('en-IN')} PCS`,
+            sub: `${overallStats.shortageQtyPcs.toLocaleString('en-IN')} PCS Short (${overallStats.shortageItems} SKUs)`,
+            color: '#ef4444',
+          },
+          {
+            label: 'Excess Surplus Stock',
+            value: `${overallStats.excessCbb.toLocaleString('en-IN')} CBB + ${overallStats.excessLoosePcs.toLocaleString('en-IN')} PCS`,
+            sub: `${overallStats.excessQtyPcs.toLocaleString('en-IN')} PCS Excess (${overallStats.excessItems} SKUs)`,
+            color: '#f59e0b',
+          },
         ].map(k => (
           <div key={k.label} style={{ ...CARD_BOX, padding: '16px 18px', borderLeft: `4px solid ${k.color}` }}>
             <p style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 6px' }}>{k.label}</p>
-            <p style={{ fontSize: 20, fontWeight: 800, color: '#0f172a', margin: '0 0 2px' }}>{k.value}</p>
+            <p style={{ fontSize: 17, fontWeight: 800, color: '#0f172a', margin: '0 0 2px' }}>{k.value}</p>
             <p style={{ fontSize: 11, color: '#64748b', margin: 0 }}>{k.sub}</p>
           </div>
         ))}
@@ -979,9 +1097,9 @@ export function Reports() {
                   <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
                     <th style={{ padding: '11px 16px', fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'left' }}>Brand</th>
                     <th style={{ padding: '11px 16px', fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'left' }}>SKU Progress</th>
-                    <th style={{ padding: '11px 16px', fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'right' }}>System Qty</th>
-                    <th style={{ padding: '11px 16px', fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'right' }}>Physical Qty</th>
-                    <th style={{ padding: '11px 16px', fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'right' }}>Net Variance</th>
+                    <th style={{ padding: '11px 16px', fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'right' }}>System Stock (CBB & PCS)</th>
+                    <th style={{ padding: '11px 16px', fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'right' }}>Physical Stock (CBB & PCS)</th>
+                    <th style={{ padding: '11px 16px', fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'right' }}>Net Difference (CBB & PCS)</th>
                     <th style={{ padding: '11px 16px', fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'right' }}>Discrepancies</th>
                   </tr>
                 </thead>
@@ -997,7 +1115,7 @@ export function Reports() {
                   ) : (
                     filteredPreviewRows.map((b: any) => {
                       const pct = b['Total SKUs'] > 0 ? Math.round((b['Counted SKUs'] / b['Total SKUs']) * 100) : 0;
-                      const netVar = b['Net Variance (PCS)'];
+                      const netVar = Number(b['Net Variance (PCS)']) || 0;
 
                       return (
                         <tr key={b['Brand']} style={{ borderBottom: '1px solid #f1f5f9' }}>
@@ -1019,11 +1137,13 @@ export function Reports() {
                               </span>
                             </div>
                           </td>
-                          <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 600, color: '#334155' }}>
-                            {Number(b['System Qty (PCS)']).toLocaleString('en-IN')} PCS
+                          <td style={{ padding: '12px 16px', textAlign: 'right' }}>
+                            <div style={{ fontWeight: 700, color: '#334155' }}>{b['System Stock (CBB & PCS)']}</div>
+                            <div style={{ fontSize: 11, color: '#94a3b8' }}>{Number(b['System Qty (PCS)']).toLocaleString('en-IN')} PCS</div>
                           </td>
-                          <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 600, color: '#10b981' }}>
-                            {Number(b['Physical Qty (PCS)']).toLocaleString('en-IN')} PCS
+                          <td style={{ padding: '12px 16px', textAlign: 'right' }}>
+                            <div style={{ fontWeight: 700, color: '#10b981' }}>{b['Physical Stock (CBB & PCS)']}</div>
+                            <div style={{ fontSize: 11, color: '#94a3b8' }}>{Number(b['Physical Qty (PCS)']).toLocaleString('en-IN')} PCS</div>
                           </td>
                           <td style={{ padding: '12px 16px', textAlign: 'right' }}>
                             <span
@@ -1036,8 +1156,11 @@ export function Reports() {
                                 color: netVar < 0 ? '#dc2626' : netVar > 0 ? '#d97706' : '#16a34a',
                               }}
                             >
-                              {netVar > 0 ? '+' : ''}{Number(netVar).toLocaleString('en-IN')} PCS
+                              {b['Net Difference (CBB & PCS)']}
                             </span>
+                            <div style={{ fontSize: 11, fontWeight: 600, color: netVar < 0 ? '#dc2626' : netVar > 0 ? '#d97706' : '#16a34a', marginTop: 2 }}>
+                              {netVar > 0 ? '+' : ''}{netVar.toLocaleString('en-IN')} PCS
+                            </div>
                           </td>
                           <td style={{ padding: '12px 16px', textAlign: 'right' }}>
                             <span style={{ fontSize: 11, fontWeight: 600, color: b['Shortage Count'] > 0 ? '#dc2626' : '#64748b' }}>
@@ -1058,15 +1181,16 @@ export function Reports() {
                     <th style={{ padding: '11px 16px', fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'left' }}>Material & Desc</th>
                     <th style={{ padding: '11px 16px', fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'left' }}>Brand</th>
                     <th style={{ padding: '11px 16px', fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'right' }}>MRP</th>
+                    <th style={{ padding: '11px 16px', fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'center' }}>1 CBB</th>
                     <th style={{ padding: '11px 16px', fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'right' }}>Primary Audit</th>
                     <th style={{ padding: '11px 16px', fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'right' }}>Secondary Audit</th>
-                    <th style={{ padding: '11px 16px', fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'right' }}>Count Delta</th>
+                    <th style={{ padding: '11px 16px', fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'right' }}>Count Delta (CBB & PCS)</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredPreviewRows.length === 0 ? (
                     <tr>
-                      <td colSpan={6} style={{ padding: 48, textAlign: 'center', color: '#64748b' }}>
+                      <td colSpan={7} style={{ padding: 48, textAlign: 'center', color: '#64748b' }}>
                         <History size={36} color="#cbd5e1" style={{ margin: '0 auto 8px', display: 'block' }} />
                         <p style={{ fontWeight: 600, margin: '0 0 4px', color: '#334155' }}>
                           {!compareUploadId ? 'Select a secondary snapshot above to compare' : 'No matching materials found'}
@@ -1085,6 +1209,7 @@ export function Reports() {
                           </td>
                           <td style={{ padding: '10px 16px', color: '#475569', fontWeight: 600 }}>{r['Brand']}</td>
                           <td style={{ padding: '10px 16px', textAlign: 'right', fontWeight: 600, color: '#475569' }}>₹{r['MRP (₹)']}</td>
+                          <td style={{ padding: '10px 16px', textAlign: 'center', fontSize: 11, color: '#64748b', fontWeight: 600 }}>{r['Case Size (1 CBB)']}</td>
                           <td style={{ padding: '10px 16px', textAlign: 'right' }}>
                             <div style={{ fontSize: 12, fontWeight: 600, color: '#0f172a' }}>{r['Upload A Phy (PCS)']} PCS</div>
                             <div style={{ fontSize: 11, color: r['Upload A Var (PCS)'] < 0 ? '#dc2626' : '#64748b' }}>Var: {r['Upload A Var (PCS)']}</div>
@@ -1104,8 +1229,11 @@ export function Reports() {
                                 color: delta > 0 ? '#16a34a' : delta < 0 ? '#dc2626' : '#64748b',
                               }}
                             >
-                              {delta > 0 ? '+' : ''}{delta} PCS
+                              {r['Delta Difference (CBB & PCS)']}
                             </span>
+                            <div style={{ fontSize: 11, fontWeight: 600, color: delta > 0 ? '#16a34a' : delta < 0 ? '#dc2626' : '#64748b', marginTop: 2 }}>
+                              {delta > 0 ? '+' : ''}{delta} PCS
+                            </div>
                           </td>
                         </tr>
                       );
@@ -1123,9 +1251,10 @@ export function Reports() {
                     <th style={{ padding: '11px 14px', fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'left' }}>Description</th>
                     <th style={{ padding: '11px 14px', fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'left' }}>Brand</th>
                     <th style={{ padding: '11px 14px', fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'right' }}>MRP</th>
-                    <th style={{ padding: '11px 14px', fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'right' }}>System</th>
-                    <th style={{ padding: '11px 14px', fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'right' }}>Physical</th>
-                    <th style={{ padding: '11px 14px', fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'right' }}>Variance</th>
+                    <th style={{ padding: '11px 14px', fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'center' }}>1 CBB Size</th>
+                    <th style={{ padding: '11px 14px', fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'right' }}>System Stock</th>
+                    <th style={{ padding: '11px 14px', fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'right' }}>Physical Stock</th>
+                    <th style={{ padding: '11px 14px', fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'right' }}>Difference (CBB & PCS)</th>
                     <th style={{ padding: '11px 14px', fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'center' }}>Status</th>
                     <th style={{ padding: '11px 14px', fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'left' }}>Audit Trend</th>
                   </tr>
@@ -1133,7 +1262,7 @@ export function Reports() {
                 <tbody>
                   {filteredPreviewRows.length === 0 ? (
                     <tr>
-                      <td colSpan={10} style={{ padding: 48, textAlign: 'center', color: '#64748b' }}>
+                      <td colSpan={11} style={{ padding: 48, textAlign: 'center', color: '#64748b' }}>
                         <CheckCircle2 size={38} color="#10b981" style={{ margin: '0 auto 8px', display: 'block' }} />
                         <p style={{ fontWeight: 700, fontSize: 15, margin: '0 0 4px', color: '#0f172a' }}>
                           {searchQuery
@@ -1173,7 +1302,7 @@ export function Reports() {
                           <td style={{ padding: '10px 14px', fontFamily: 'monospace', fontWeight: 700, color: '#0f172a' }}>
                             {r['Material']}
                           </td>
-                          <td style={{ padding: '10px 14px', color: '#334155', maxWidth: 280 }}>
+                          <td style={{ padding: '10px 14px', color: '#334155', maxWidth: 240 }}>
                             <span style={{ display: '-webkit-box', WebkitLineClamp: 1, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
                               {r['Description']}
                             </span>
@@ -1186,28 +1315,44 @@ export function Reports() {
                           <td style={{ padding: '10px 14px', textAlign: 'right', fontWeight: 600, color: '#64748b' }}>
                             ₹{r['MRP (₹)']}
                           </td>
-                          <td style={{ padding: '10px 14px', textAlign: 'right', fontWeight: 600, color: '#334155' }}>
-                            {Number(r['System Qty (PCS)']).toLocaleString('en-IN')}
+                          <td style={{ padding: '10px 14px', textAlign: 'center', fontSize: 11, color: '#64748b', fontWeight: 600 }}>
+                            {r['Case Size (1 CBB)']}
                           </td>
-                          <td style={{ padding: '10px 14px', textAlign: 'right', fontWeight: 600, color: hasCount ? '#0f172a' : '#94a3b8' }}>
-                            {hasCount ? Number(r['Physical Qty (PCS)']).toLocaleString('en-IN') : '—'}
+                          <td style={{ padding: '10px 14px', textAlign: 'right' }}>
+                            <div style={{ fontWeight: 700, color: '#334155' }}>{r['System Stock (CBB & PCS)']}</div>
+                            <div style={{ fontSize: 11, color: '#94a3b8' }}>{Number(r['System Qty (PCS)']).toLocaleString('en-IN')} PCS</div>
                           </td>
                           <td style={{ padding: '10px 14px', textAlign: 'right' }}>
                             {hasCount ? (
-                              <span
-                                style={{
-                                  fontSize: 12,
-                                  fontWeight: 700,
-                                  padding: '2px 7px',
-                                  borderRadius: 5,
-                                  background: numVar < 0 ? '#fef2f2' : numVar > 0 ? '#fffbeb' : '#f0fdf4',
-                                  color: numVar < 0 ? '#dc2626' : numVar > 0 ? '#d97706' : '#16a34a',
-                                }}
-                              >
-                                {numVar > 0 ? '+' : ''}{numVar} PCS
-                              </span>
+                              <>
+                                <div style={{ fontWeight: 700, color: '#0f172a' }}>{r['Physical Stock (CBB & PCS)']}</div>
+                                <div style={{ fontSize: 11, color: '#94a3b8' }}>{Number(r['Physical Qty (PCS)']).toLocaleString('en-IN')} PCS</div>
+                              </>
                             ) : (
                               <span style={{ color: '#94a3b8', fontSize: 11 }}>Uncounted</span>
+                            )}
+                          </td>
+                          <td style={{ padding: '10px 14px', textAlign: 'right' }}>
+                            {hasCount ? (
+                              <>
+                                <span
+                                  style={{
+                                    fontSize: 12,
+                                    fontWeight: 700,
+                                    padding: '2px 7px',
+                                    borderRadius: 5,
+                                    background: numVar < 0 ? '#fef2f2' : numVar > 0 ? '#fffbeb' : '#f0fdf4',
+                                    color: numVar < 0 ? '#dc2626' : numVar > 0 ? '#d97706' : '#16a34a',
+                                  }}
+                                >
+                                  {r['Difference (CBB & PCS)']}
+                                </span>
+                                <div style={{ fontSize: 11, fontWeight: 600, color: numVar < 0 ? '#dc2626' : numVar > 0 ? '#d97706' : '#16a34a', marginTop: 2 }}>
+                                  {numVar > 0 ? '+' : ''}{numVar} PCS
+                                </div>
+                              </>
+                            ) : (
+                              <span style={{ color: '#94a3b8', fontSize: 11 }}>—</span>
                             )}
                           </td>
                           <td style={{ padding: '10px 14px', textAlign: 'center' }}>

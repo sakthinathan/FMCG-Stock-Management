@@ -27,15 +27,17 @@ export function exportReportToPdf(
   stats: {
     totalSkus: number;
     countedSkus: number;
+    systemCbb?: number;
+    systemLoosePcs?: number;
+    physicalCbb?: number;
+    physicalLoosePcs?: number;
+    netVarCbb?: number;
+    netVarLoosePcs?: number;
     systemQtyPcs?: number;
     physicalQtyPcs?: number;
     netVariancePcs?: number;
     shortageItems?: number;
     excessItems?: number;
-    systemValue?: number;
-    physicalValue?: number;
-    shortageValue?: number;
-    excessValue?: number;
   },
   agencyName = 'FMCG DISTRIBUTOR'
 ) {
@@ -64,35 +66,47 @@ export function exportReportToPdf(
   doc.setFontSize(9);
   doc.text(`Generated: ${dateStr}`, 280, 21, { align: 'right' });
 
-  // ── Summary Metrics Banner (Quantities Only) ────────────────────────────────
+  // ── Summary Metrics Banner (CBB & PCS Operational Quantities) ───────────────
   doc.setFillColor(248, 250, 252);
   doc.setDrawColor(226, 232, 240);
   doc.roundedRect(14, 32, 269, 16, 3, 3, 'FD');
 
-  doc.setFontSize(9);
+  doc.setFontSize(8);
   doc.setTextColor(71, 85, 105);
-  doc.text(`Total SKUs: ${stats.totalSkus}`, 20, 42);
-  doc.text(`Counted SKUs: ${stats.countedSkus}`, 68, 42);
-  doc.text(`System Qty: ${(stats.systemQtyPcs || 0).toLocaleString('en-IN')} PCS`, 120, 42);
-  doc.text(`Physical Qty: ${(stats.physicalQtyPcs || 0).toLocaleString('en-IN')} PCS`, 185, 42);
+  doc.text(`Total SKUs: ${stats.totalSkus}`, 18, 42);
+  doc.text(`Counted SKUs: ${stats.countedSkus}`, 52, 42);
+
+  const sysText = stats.systemCbb !== undefined
+    ? `${stats.systemCbb} CBB + ${stats.systemLoosePcs}P`
+    : `${(stats.systemQtyPcs || 0).toLocaleString('en-IN')} PCS`;
+  doc.text(`System: ${sysText}`, 90, 42);
+
+  const phyText = stats.physicalCbb !== undefined
+    ? `${stats.physicalCbb} CBB + ${stats.physicalLoosePcs}P`
+    : `${(stats.physicalQtyPcs || 0).toLocaleString('en-IN')} PCS`;
+  doc.text(`Physical: ${phyText}`, 150, 42);
+
   const netVar = stats.netVariancePcs || 0;
-  doc.text(`Net Variance: ${netVar > 0 ? '+' : ''}${netVar.toLocaleString('en-IN')} PCS`, 245, 42);
+  const netVarText = stats.netVarCbb !== undefined
+    ? `${netVar < 0 ? '-' : netVar > 0 ? '+' : ''}${stats.netVarCbb} CBB ${netVar < 0 ? '-' : netVar > 0 ? '+' : ''}${stats.netVarLoosePcs}P (${netVar > 0 ? '+' : ''}${netVar.toLocaleString('en-IN')} P)`
+    : `${netVar > 0 ? '+' : ''}${netVar.toLocaleString('en-IN')} PCS`;
+  doc.text(`Net Difference: ${netVarText}`, 210, 42);
 
   const isBrandSummary = rows.length > 0 && rows[0]['Total SKUs'] !== undefined;
 
   if (isBrandSummary) {
     const head = [[
       'Brand', 'Total SKUs', 'Counted SKUs', 'Progress %',
-      'System Qty (PCS)', 'Physical Qty (PCS)', 'Net Variance (PCS)', 'Shortages', 'Excess'
+      'System Stock (CBB & PCS)', 'Physical Stock (CBB & PCS)', 'Net Difference (CBB & PCS)', 'Shortages', 'Excess'
     ]];
     const body = rows.map(r => [
       r['Brand'] || '',
       r['Total SKUs'] || 0,
       r['Counted SKUs'] || 0,
       r['Progress %'] || '0%',
-      r['System Qty (PCS)'] || 0,
-      r['Physical Qty (PCS)'] || 0,
-      r['Net Variance (PCS)'] !== undefined ? (r['Net Variance (PCS)'] > 0 ? `+${r['Net Variance (PCS)']}` : r['Net Variance (PCS)']) : 0,
+      r['System Stock (CBB & PCS)'] || `${r['System Qty (PCS)']} PCS`,
+      r['Physical Stock (CBB & PCS)'] || `${r['Physical Qty (PCS)']} PCS`,
+      r['Net Difference (CBB & PCS)'] || (r['Net Variance (PCS)'] !== undefined ? (r['Net Variance (PCS)'] > 0 ? `+${r['Net Variance (PCS)']} PCS` : `${r['Net Variance (PCS)']} PCS`) : '0 PCS'),
       r['Shortage Count'] || 0,
       r['Excess Count'] || 0,
     ]);
@@ -107,15 +121,15 @@ export function exportReportToPdf(
       alternateRowStyles: { fillColor: [248, 250, 252] },
       showHead: 'everyPage',
       columnStyles: {
-        0: { cellWidth: 50, fontStyle: 'bold' },
-        1: { halign: 'right', cellWidth: 26 },
-        2: { halign: 'right', cellWidth: 26 },
-        3: { halign: 'center', cellWidth: 26 },
-        4: { halign: 'right', cellWidth: 32 },
-        5: { halign: 'right', cellWidth: 32 },
-        6: { halign: 'right', cellWidth: 32, fontStyle: 'bold' },
-        7: { halign: 'right', cellWidth: 22 },
-        8: { halign: 'right', cellWidth: 22 },
+        0: { cellWidth: 42, fontStyle: 'bold' },
+        1: { halign: 'right', cellWidth: 22 },
+        2: { halign: 'right', cellWidth: 22 },
+        3: { halign: 'center', cellWidth: 22 },
+        4: { halign: 'right', cellWidth: 42 },
+        5: { halign: 'right', cellWidth: 42 },
+        6: { halign: 'right', cellWidth: 42, fontStyle: 'bold' },
+        7: { halign: 'right', cellWidth: 18 },
+        8: { halign: 'right', cellWidth: 18 },
       },
     });
   } else {
@@ -159,24 +173,32 @@ export function exportReportToPdf(
         ]);
       }
 
-      // Data row — Brand column omitted (group headers make it redundant); Variance Value omitted
+      // Data row with CBB & PCS representation
+      const sysVal = r['System Stock (CBB & PCS)'] || `${r['System Qty (PCS)'] || 0} PCS`;
+      const phyVal = r['Physical Stock (CBB & PCS)'] !== undefined
+        ? r['Physical Stock (CBB & PCS)']
+        : (r['Physical Qty (PCS)'] !== undefined ? `${r['Physical Qty (PCS)']} PCS` : '');
+      const diffVal = r['Difference (CBB & PCS)'] !== undefined && r['Difference (CBB & PCS)'] !== ''
+        ? r['Difference (CBB & PCS)']
+        : (r['Variance (PCS)'] !== undefined && r['Variance (PCS)'] !== ''
+            ? `${r['Variance (PCS)']} PCS`
+            : (r['Current Variance (PCS)'] !== undefined && r['Current Variance (PCS)'] !== '' ? `${r['Current Variance (PCS)']} PCS` : ''));
+
       body.push([
         r['Material'] || '',
-        (r['Description'] || '').substring(0, 38),
-        r['MRP (₹)'] || r['MRP (RS)'] || 0,
-        r['System Qty (PCS)'] || 0,
-        r['Physical Qty (PCS)'] !== undefined ? r['Physical Qty (PCS)'] : '',
-        r['Variance (PCS)'] !== undefined && r['Variance (PCS)'] !== '' 
-          ? r['Variance (PCS)'] 
-          : (r['Current Variance (PCS)'] !== undefined && r['Current Variance (PCS)'] !== '' ? r['Current Variance (PCS)'] : ''),
+        (r['Description'] || '').substring(0, 36),
+        r['Case Size (1 CBB)'] || '1 PCS',
+        sysVal,
+        phyVal,
+        diffVal,
         r['Status'] || r['Trend'] || '',
       ]);
     }
 
-    // ── 4. Column headers (7 cols — Brand removed; Variance Value removed) ─────
+    // ── 4. Column headers (7 cols with CBB & PCS columns) ─────
     const head = [[
-      'Material', 'Description', 'MRP (RS)',
-      'System Pcs', 'Physical Pcs', 'Variance (PCS)',
+      'Material', 'Description', '1 CBB Size',
+      'System (CBB & PCS)', 'Physical (CBB & PCS)', 'Difference (CBB & PCS)',
       'Status',
     ]];
 
@@ -190,13 +212,13 @@ export function exportReportToPdf(
       alternateRowStyles: { fillColor: [248, 250, 252] },
       showHead: 'everyPage',
       columnStyles: {
-        0: { cellWidth: 32 },                                    // Material
-        1: { cellWidth: 80 },                                    // Description
-        2: { halign: 'right', cellWidth: 24 },                   // MRP
-        3: { halign: 'right', cellWidth: 30 },                   // System Pcs
-        4: { halign: 'right', cellWidth: 30 },                   // Physical Pcs
-        5: { halign: 'right', cellWidth: 30, fontStyle: 'bold' },// Variance
-        6: { halign: 'center', cellWidth: 32 },                  // Status
+        0: { cellWidth: 28 },                                    // Material
+        1: { cellWidth: 68 },                                    // Description
+        2: { halign: 'center', cellWidth: 22 },                  // 1 CBB Size
+        3: { halign: 'right', cellWidth: 42 },                   // System (CBB & PCS)
+        4: { halign: 'right', cellWidth: 42 },                   // Physical (CBB & PCS)
+        5: { halign: 'right', cellWidth: 42, fontStyle: 'bold' },// Difference (CBB & PCS)
+        6: { halign: 'center', cellWidth: 26 },                  // Status
       },
     });
   }

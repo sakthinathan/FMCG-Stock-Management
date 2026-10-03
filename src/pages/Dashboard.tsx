@@ -8,6 +8,7 @@ import { EmptyState } from '@/components/common/EmptyState';
 import { KpiStatCard } from '@/components/common/KpiStatCard';
 import { StatusBadge } from '@/components/common/StatusBadge';
 import { PageHeader } from '@/components/common/PageHeader';
+import { formatCbbPcs } from '@/lib/cbbUtils';
 
 const W: React.CSSProperties = { background: '#fff', borderRadius: 12, boxShadow: '0 1px 3px rgba(0,0,0,0.06)' };
 
@@ -35,7 +36,7 @@ export function Dashboard() {
       try {
         const { data: snaps } = await supabase
           .from('system_stock_snapshots')
-          .select('id, brand, material, material_desc, mrp')
+          .select('id, brand, material, material_desc, mrp, conversion')
           .eq('upload_id', activeUploadId);
 
         const { data: counts } = await supabase
@@ -63,7 +64,8 @@ export function Dashboard() {
                 desc: snap.material_desc,
                 brand: snap.brand,
                 type: c.status,
-                variance: c.variance
+                variance: c.variance,
+                conversion: Number(snap.conversion) > 0 ? Number(snap.conversion) : 1
               });
             }
           }
@@ -220,7 +222,7 @@ export function Dashboard() {
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
               <thead>
                 <tr style={{ background: '#f8fafc', borderBottom: '1px solid #f1f5f9' }}>
-                  {['Material', 'Brand', 'Status', 'Variance (PCS)'].map((h, i) => (
+                  {['Material', 'Brand', 'Status', 'Difference (CBB & PCS)'].map((h, i) => (
                     <th key={h} style={{ padding: '10px 20px', fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.07em', textAlign: i >= 2 ? 'center' : 'left' }}>{h}</th>
                   ))}
                 </tr>
@@ -239,8 +241,9 @@ export function Dashboard() {
                     <td style={{ padding: '13px 20px', textAlign: 'center' }}>
                       <StatusBadge status={issue.type} />
                     </td>
-                    <td style={{ padding: '13px 20px', textAlign: 'center', fontWeight: 800, color: issue.variance < 0 ? '#dc2626' : '#d97706', fontSize: 14 }}>
-                      {issue.variance > 0 ? '+' : ''}{issue.variance} PCS
+                    <td style={{ padding: '13px 20px', textAlign: 'center', fontWeight: 800, color: issue.variance < 0 ? '#dc2626' : '#d97706', fontSize: 13 }}>
+                      <div>{formatCbbPcs(issue.variance, issue.conversion, true)}</div>
+                      <div style={{ fontSize: 11, fontWeight: 600, color: '#94a3b8', marginTop: 1 }}>{issue.variance > 0 ? '+' : ''}{issue.variance} PCS</div>
                     </td>
                   </tr>
                 ))}

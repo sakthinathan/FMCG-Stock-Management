@@ -6,6 +6,7 @@ import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { PageHeader } from '@/components/common/PageHeader';
 import { StatusBadge } from '@/components/common/StatusBadge';
 import { EmptyState } from '@/components/common/EmptyState';
+import { calculateCbbPcs, formatCbbPcs } from '@/lib/cbbUtils';
 
 interface IssueItem {
   id: string;
@@ -13,6 +14,7 @@ interface IssueItem {
   desc: string;
   brand: string;
   mrp: number;
+  conversion: number;
   sysQty: number;
   phyQty: number;
   variance: number;
@@ -40,7 +42,7 @@ export function Issues() {
       setLoading(true);
       const { data: counts } = await supabase
         .from('physical_stock_counts')
-        .select('id, physical_total_pcs, variance, status, notes, reason_code, system_stock_snapshots!inner(id, material, material_desc, brand, mrp, system_qty_pcs, prev_variance)')
+        .select('id, physical_total_pcs, variance, status, notes, reason_code, system_stock_snapshots!inner(id, material, material_desc, brand, mrp, system_qty_pcs, prev_variance, conversion)')
         .eq('system_stock_snapshots.upload_id', activeUploadId)
         .neq('variance', 0);
 
@@ -48,6 +50,7 @@ export function Issues() {
       const fmt: IssueItem[] = (counts || []).map((c: any) => {
         const s = c.system_stock_snapshots;
         if (s.brand) bSet.add(s.brand);
+        const conv = Number(s.conversion) > 0 ? Number(s.conversion) : 1;
         const getTrend = (curr: number, prev: number) => {
           if (prev === 0 && curr !== 0) return 'New Issue';
           if (curr !== 0 && prev !== 0) {
@@ -65,6 +68,7 @@ export function Issues() {
           desc: s.material_desc,
           brand: s.brand,
           mrp: s.mrp,
+          conversion: conv,
           sysQty: s.system_qty_pcs,
           phyQty: c.physical_total_pcs,
           variance: c.variance,
@@ -233,21 +237,24 @@ export function Issues() {
                     <p style={{ fontSize: 12, color: '#64748b', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 340 }}>{issue.desc}</p>
                   </div>
 
-                  {/* Numbers */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 16, background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 10, padding: '10px 16px', flexShrink: 0 }}>
+                  {/* Numbers (CBB and PCS) */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 14, background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 10, padding: '10px 16px', flexShrink: 0 }}>
                     <div style={{ textAlign: 'center' }}>
-                      <p style={{ fontSize: 10, fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', margin: '0 0 3px' }}>System</p>
-                      <p style={{ fontWeight: 700, color: '#0f172a', margin: 0, fontSize: 14 }}>{issue.sysQty}</p>
+                      <p style={{ fontSize: 10, fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', margin: '0 0 2px' }}>System</p>
+                      <p style={{ fontWeight: 700, color: '#0f172a', margin: 0, fontSize: 13 }}>{calculateCbbPcs(issue.sysQty, issue.conversion).formatted}</p>
+                      <p style={{ fontSize: 10, color: '#64748b', margin: 0 }}>{issue.sysQty} PCS</p>
                     </div>
-                    <div style={{ width: 1, height: 28, background: '#e2e8f0' }} />
+                    <div style={{ width: 1, height: 32, background: '#e2e8f0' }} />
                     <div style={{ textAlign: 'center' }}>
-                      <p style={{ fontSize: 10, fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', margin: '0 0 3px' }}>Physical</p>
-                      <p style={{ fontWeight: 700, color: '#0f172a', margin: 0, fontSize: 14 }}>{issue.phyQty}</p>
+                      <p style={{ fontSize: 10, fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', margin: '0 0 2px' }}>Physical</p>
+                      <p style={{ fontWeight: 700, color: '#0f172a', margin: 0, fontSize: 13 }}>{calculateCbbPcs(issue.phyQty, issue.conversion).formatted}</p>
+                      <p style={{ fontSize: 10, color: '#64748b', margin: 0 }}>{issue.phyQty} PCS</p>
                     </div>
-                    <div style={{ width: 1, height: 28, background: '#e2e8f0' }} />
+                    <div style={{ width: 1, height: 32, background: '#e2e8f0' }} />
                     <div style={{ textAlign: 'center' }}>
-                      <p style={{ fontSize: 10, fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', margin: '0 0 3px' }}>Variance</p>
-                      <p style={{ fontWeight: 700, color: isShortage ? '#dc2626' : '#d97706', margin: 0, fontSize: 15 }}>{issue.variance > 0 ? '+' : ''}{issue.variance}</p>
+                      <p style={{ fontSize: 10, fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', margin: '0 0 2px' }}>Difference</p>
+                      <p style={{ fontWeight: 700, color: isShortage ? '#dc2626' : '#d97706', margin: 0, fontSize: 13 }}>{formatCbbPcs(issue.variance, issue.conversion, true)}</p>
+                      <p style={{ fontSize: 10, fontWeight: 600, color: isShortage ? '#dc2626' : '#d97706', margin: 0 }}>{issue.variance > 0 ? '+' : ''}{issue.variance} PCS</p>
                     </div>
                   </div>
 
