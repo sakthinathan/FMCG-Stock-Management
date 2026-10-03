@@ -53,6 +53,9 @@ export function BrandSelectorReportModal({
   const [statusNotice, setStatusNotice] = useState<string | null>(null);
   const [copiedSummary, setCopiedSummary] = useState(false);
   const [lastWaUrl, setLastWaUrl] = useState<string | null>(null);
+  const [recipientPhone, setRecipientPhone] = useState<string>(() => {
+    return localStorage.getItem('fmcg_audit_recipient_phone') || '';
+  });
 
   // Completed & Counted presets
   const completedBrands = useMemo(() => {
@@ -182,6 +185,7 @@ export function BrandSelectorReportModal({
       const pdfFile = pdfResult ? pdfResult.file : null;
 
       const shareResult = await shareReportToWhatsApp(whatsappMessageText, pdfFile, {
+        recipientPhone,
         onDownloadTriggered: () => {
           if (pdfResult) {
             pdfResult.doc.save(pdfResult.filename);
@@ -227,7 +231,7 @@ export function BrandSelectorReportModal({
   // 3. Send WhatsApp Summary Text Only (Instant 1-Click Redirect)
   const handleSendWhatsAppTextOnly = async () => {
     await copyToClipboard(whatsappMessageText);
-    const waUrl = getWhatsAppShareUrl(whatsappMessageText);
+    const waUrl = getWhatsAppShareUrl(whatsappMessageText, recipientPhone);
     setLastWaUrl(waUrl);
     navigateToUrl(waUrl);
     setStatusNotice('Opening WhatsApp with summary message text pre-drafted...');
@@ -474,6 +478,47 @@ export function BrandSelectorReportModal({
                 Net Var: {netVarianceCbbPcs}
               </span>
             </div>
+          </div>
+
+          {/* Optional Recipient Phone Number */}
+          <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 12, padding: '10px 14px' }}>
+            <label style={{ fontSize: 11, fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+              <MessageCircle size={13} color="#16a34a" /> Direct Recipient WhatsApp No. (Optional):
+            </label>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 12, fontWeight: 700, color: '#64748b', background: '#e2e8f0', padding: '6px 8px', borderRadius: 6 }}>+91</span>
+              <input
+                type="tel"
+                placeholder="10-digit mobile no. (e.g. 9876543210 or leave empty)"
+                value={recipientPhone}
+                onChange={e => {
+                  const val = e.target.value.replace(/[^0-9]/g, '').slice(0, 10);
+                  setRecipientPhone(val);
+                  localStorage.setItem('fmcg_audit_recipient_phone', val);
+                }}
+                style={{
+                  flex: 1, height: 34, padding: '0 10px', borderRadius: 6, border: '1px solid #cbd5e1',
+                  fontSize: 12, fontWeight: 600, color: '#0f172a', outline: 'none', background: '#fff'
+                }}
+              />
+              {recipientPhone && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRecipientPhone('');
+                    localStorage.removeItem('fmcg_audit_recipient_phone');
+                  }}
+                  style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#94a3b8', fontSize: 11, fontWeight: 600 }}
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+            <p style={{ fontSize: 10, color: '#94a3b8', margin: '4px 0 0' }}>
+              {recipientPhone.length === 10
+                ? '✓ Will open direct chat with this number on WhatsApp Web & Mobile'
+                : 'Leave blank to select any person or group from your WhatsApp contact list'}
+            </p>
           </div>
 
           {/* Accordion: WhatsApp Message Text Preview */}

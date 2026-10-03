@@ -119,7 +119,7 @@ export function createReportPdfDocument(
       startY: 52,
       theme: 'grid',
       styles: { fontSize: 8, cellPadding: 3, font: 'helvetica' },
-      headStyles: { fillColor: [79, 70, 229], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8.5 },
+      headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8.5 },
       alternateRowStyles: { fillColor: [248, 250, 252] },
       showHead: 'everyPage',
       columnStyles: {
@@ -133,6 +133,31 @@ export function createReportPdfDocument(
         7: { halign: 'right', cellWidth: 18 },
         8: { halign: 'right', cellWidth: 18 },
       },
+      didParseCell: (data) => {
+        if (data.section !== 'body') return;
+        const colIdx = data.column.index;
+        // Shortage count in red
+        if (colIdx === 7 && Number(data.cell.raw) > 0) {
+          data.cell.styles.textColor = [185, 28, 28];
+          data.cell.styles.fillColor = [254, 226, 226];
+          data.cell.styles.fontStyle = 'bold';
+        }
+        // Excess count in green
+        if (colIdx === 8 && Number(data.cell.raw) > 0) {
+          data.cell.styles.textColor = [21, 128, 61];
+          data.cell.styles.fillColor = [220, 252, 231];
+          data.cell.styles.fontStyle = 'bold';
+        }
+        // Net Difference
+        if (colIdx === 6) {
+          const val = String(data.cell.raw || '');
+          if (val.startsWith('-')) {
+            data.cell.styles.textColor = [185, 28, 28];
+          } else if (val.startsWith('+')) {
+            data.cell.styles.textColor = [21, 128, 61];
+          }
+        }
+      }
     });
   } else {
     // ── 1. Sort: Brand A-Z → Material A-Z within each brand ───────────────────
@@ -163,19 +188,22 @@ export function createReportPdfDocument(
         body.push([
           {
             content: `  ${brand.toUpperCase()}   —   ${skuCount} SKU${skuCount !== 1 ? 's' : ''}`,
-            colSpan: 7,
+            colSpan: 8,
             styles: {
-              fillColor: [30, 41, 59],
+              fillColor: [15, 23, 42],
               textColor: [248, 250, 252],
               fontStyle: 'bold',
               fontSize: 8.5,
-              cellPadding: { top: 5, right: 8, bottom: 5, left: 10 },
+              cellPadding: { top: 4, right: 8, bottom: 4, left: 10 },
             },
           },
         ]);
       }
 
-      // Data row with CBB & PCS representation
+      // Data row with MRP and CBB & PCS representation
+      const mrpNum = Number(r['MRP (₹)'] !== undefined ? r['MRP (₹)'] : (r['MRP'] !== undefined ? r['MRP'] : 0));
+      const mrpVal = mrpNum > 0 ? `₹${mrpNum.toFixed(2)}` : '—';
+
       const sysVal = r['System Stock (CBB & PCS)'] || `${r['System Qty (PCS)'] || 0} PCS`;
       const phyVal = r['Physical Stock (CBB & PCS)'] !== undefined
         ? r['Physical Stock (CBB & PCS)']
@@ -186,22 +214,25 @@ export function createReportPdfDocument(
             ? `${r['Variance (PCS)']} PCS`
             : (r['Current Variance (PCS)'] !== undefined && r['Current Variance (PCS)'] !== '' ? `${r['Current Variance (PCS)']} PCS` : ''));
 
+      const statusVal = r['Status'] || r['Trend'] || 'Not Counted';
+
       body.push([
         r['Material'] || '',
         (r['Description'] || '').substring(0, 36),
+        mrpVal,
         r['Case Size (1 CBB)'] || '1 PCS',
         sysVal,
         phyVal,
         diffVal,
-        r['Status'] || r['Trend'] || '',
+        statusVal,
       ]);
     }
 
-    // ── 4. Column headers (7 cols with CBB & PCS columns) ─────
+    // ── 4. Column headers (8 cols with MRP and CBB & PCS columns) ─────
     const head = [[
-      'Material', 'Description', '1 CBB Size',
-      'System (CBB & PCS)', 'Physical (CBB & PCS)', 'Difference (CBB & PCS)',
-      'Status',
+      'Material', 'Description', 'MRP', '1 CBB Size',
+      'System Stock', 'Physical Stock', 'Difference (CBB & PCS)',
+      'Audit Status',
     ]];
 
     autoTable(doc, {
@@ -209,18 +240,84 @@ export function createReportPdfDocument(
       body,
       startY: 52,
       theme: 'grid',
-      styles: { fontSize: 7.5, cellPadding: 2.5, font: 'helvetica', overflow: 'ellipsize' },
-      headStyles: { fillColor: [79, 70, 229], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8 },
+      styles: { fontSize: 7.5, cellPadding: 2.5, font: 'helvetica', overflow: 'ellipsize', lineColor: [226, 232, 240], lineWidth: 0.2 },
+      headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8 },
       alternateRowStyles: { fillColor: [248, 250, 252] },
       showHead: 'everyPage',
       columnStyles: {
-        0: { cellWidth: 28 },                                    // Material
-        1: { cellWidth: 68 },                                    // Description
-        2: { halign: 'center', cellWidth: 22 },                  // 1 CBB Size
-        3: { halign: 'right', cellWidth: 42 },                   // System (CBB & PCS)
-        4: { halign: 'right', cellWidth: 42 },                   // Physical (CBB & PCS)
-        5: { halign: 'right', cellWidth: 42, fontStyle: 'bold' },// Difference (CBB & PCS)
-        6: { halign: 'center', cellWidth: 26 },                  // Status
+        0: { cellWidth: 26, fontStyle: 'bold' },                  // Material
+        1: { cellWidth: 58 },                                    // Description
+        2: { halign: 'right', cellWidth: 18, fontStyle: 'bold' },// MRP
+        3: { halign: 'center', cellWidth: 20 },                  // 1 CBB Size
+        4: { halign: 'right', cellWidth: 41 },                   // System Stock
+        5: { halign: 'right', cellWidth: 41 },                   // Physical Stock
+        6: { halign: 'right', cellWidth: 42, fontStyle: 'bold' },// Difference (CBB & PCS)
+        7: { halign: 'center', cellWidth: 24, fontStyle: 'bold' },// Audit Status
+      },
+      didParseCell: (data) => {
+        if (data.section !== 'body') return;
+        // Skip brand group header rows
+        if (data.row.raw && Array.isArray(data.row.raw) && data.row.raw[0] && typeof data.row.raw[0] === 'object') {
+          return;
+        }
+
+        const colIdx = data.column.index;
+        const status = String(data.row.cells[7]?.text?.[0] || '').trim();
+        const diffText = String(data.row.cells[6]?.text?.[0] || '').trim();
+
+        // 1. Audit Status Column (Last column): Green for equal and excess, Red for shortage
+        if (colIdx === 7) {
+          data.cell.styles.fontStyle = 'bold';
+          data.cell.styles.fontSize = 7.5;
+          if (status === 'Shortage' || status.toLowerCase().includes('short')) {
+            // Shortage in red
+            data.cell.styles.textColor = [185, 28, 28]; // deep red #b91c1c
+            data.cell.styles.fillColor = [254, 226, 226]; // soft red bg #fee2e2
+          } else if (status === 'Excess' || status.toLowerCase().includes('excess')) {
+            // Excess in green (as requested: "mark in green for equal and excess")
+            data.cell.styles.textColor = [21, 128, 61]; // deep green #15803d
+            data.cell.styles.fillColor = [220, 252, 231]; // soft green bg #dcfce7
+          } else if (
+            status === 'Equal' ||
+            status === 'Matched' ||
+            status === 'OK' ||
+            status === 'Resolved' ||
+            diffText.includes('0 CBB 0 PCS') ||
+            diffText === '0 PCS' ||
+            diffText === '+0 PCS'
+          ) {
+            // Equal / Matched in green
+            data.cell.styles.textColor = [21, 128, 61]; // deep green #15803d
+            data.cell.styles.fillColor = [240, 253, 244]; // soft green bg #f0fdf4
+          } else if (status === 'Not Counted') {
+            data.cell.styles.textColor = [100, 116, 139];
+            data.cell.styles.fillColor = [241, 245, 249];
+          }
+        }
+
+        // 2. Difference Column (Col 6): Red for negative/shortage, Green for positive/excess and zero
+        if (colIdx === 6) {
+          data.cell.styles.fontStyle = 'bold';
+          if (diffText.startsWith('-') || status === 'Shortage') {
+            data.cell.styles.textColor = [185, 28, 28]; // deep red
+          } else if (diffText.startsWith('+') || status === 'Excess') {
+            data.cell.styles.textColor = [21, 128, 61]; // deep green
+          } else if (diffText.includes('0 CBB 0 PCS') || diffText === '0 PCS') {
+            data.cell.styles.textColor = [22, 101, 52]; // green
+          }
+        }
+
+        // 3. Material Code Column (Col 0)
+        if (colIdx === 0) {
+          data.cell.styles.fontStyle = 'bold';
+          data.cell.styles.textColor = [15, 23, 42];
+        }
+
+        // 4. MRP Column (Col 2)
+        if (colIdx === 2) {
+          data.cell.styles.fontStyle = 'bold';
+          data.cell.styles.textColor = [51, 65, 85];
+        }
       },
     });
   }

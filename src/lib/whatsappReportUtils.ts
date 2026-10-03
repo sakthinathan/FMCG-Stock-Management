@@ -87,19 +87,21 @@ export function isMobileDevice(): boolean {
 export function getWhatsAppShareUrl(messageText: string, recipientPhone?: string): string {
   const encodedText = encodeURIComponent(messageText);
   const cleanPhone = recipientPhone ? recipientPhone.replace(/[^0-9]/g, '') : '';
-  const phoneParam = cleanPhone ? (cleanPhone.startsWith('91') ? cleanPhone : '91' + cleanPhone) : '';
-  const isMobile = isMobileDevice();
+  const phoneParam = cleanPhone
+    ? (cleanPhone.length === 10 ? '91' + cleanPhone : cleanPhone)
+    : '';
 
-  if (isMobile) {
-    return phoneParam
-      ? `https://api.whatsapp.com/send?phone=${phoneParam}&text=${encodedText}`
-      : `https://api.whatsapp.com/send?text=${encodedText}`;
-  } else {
-    // Desktop: Direct WhatsApp Web
-    return phoneParam
-      ? `https://web.whatsapp.com/send?phone=${phoneParam}&text=${encodedText}`
-      : `https://web.whatsapp.com/send?text=${encodedText}`;
+  if (phoneParam) {
+    const isMobile = isMobileDevice();
+    if (isMobile) {
+      return `https://api.whatsapp.com/send?phone=${phoneParam}&text=${encodedText}`;
+    }
+    return `https://web.whatsapp.com/send?phone=${phoneParam}&text=${encodedText}`;
   }
+
+  // When no specific phone is given, web.whatsapp.com/send fails with "invalid phone number".
+  // api.whatsapp.com/send?text=... is the official WhatsApp Universal link that opens contact selector.
+  return `https://api.whatsapp.com/send?text=${encodedText}`;
 }
 
 /**
