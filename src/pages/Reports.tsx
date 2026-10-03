@@ -3,7 +3,7 @@ import {
   FileSpreadsheet, Download, FileText, History,
   Building2, Layers, Calendar, Search, X,
   AlertTriangle, AlertCircle, TrendingUp, TrendingDown,
-  CheckCircle2
+  CheckCircle2, Globe, ListChecks
 } from 'lucide-react';
 import { useStockStore } from '@/store/useStockStore';
 import { supabase } from '@/lib/supabase';
@@ -52,6 +52,7 @@ export function Reports() {
   const [sessions, setSessions] = useState<any[]>([]);
   const [selectedSessionId, setSelectedSessionId] = useState<string>('All');
   const [selectedBrand, setSelectedBrand] = useState('All Brands');
+  const [brandScope, setBrandScope] = useState<'all' | 'completed' | 'counted'>('all');
   const [uniqueBrands, setUniqueBrands] = useState<string[]>([]);
 
   // Raw Database Data
@@ -213,7 +214,7 @@ export function Reports() {
   }, [selectedUploadId, compareUploadId, compareMode, selectedSessionId, selectedBrand]);
 
   // 4. Compute Counts & Aggregates (Including CBB & PCS exact decomposition)
-  const { countMap, brandSummaries, overallStats, categoryCounts } = useMemo(() => {
+  const { countMap, brandSummaries } = useMemo(() => {
     const cMap = new Map();
     if (selectedSessionId !== 'All') {
       rawCounts.filter(c => c.session_id === selectedSessionId).forEach(c => cMap.set(c.snapshot_id, c));
@@ -222,26 +223,6 @@ export function Reports() {
     }
 
     const bMap = new Map<string, BrandSummaryItem>();
-    let totalSysQty = 0;
-    let totalPhyQty = 0;
-    let totalSysCbb = 0;
-    let totalSysLoosePcs = 0;
-    let totalPhyCbb = 0;
-    let totalPhyLoosePcs = 0;
-
-    let totalShortageQty = 0;
-    let totalShortageCbb = 0;
-    let totalShortageLoosePcs = 0;
-
-    let totalExcessQty = 0;
-    let totalExcessCbb = 0;
-    let totalExcessLoosePcs = 0;
-
-    let totalShortageCount = 0;
-    let totalExcessCount = 0;
-    let totalCounted = 0;
-    let newIssuesCount = 0;
-    let increasedVarianceCount = 0;
 
     rawSnapshots.forEach(snap => {
       const b = snap.brand || 'Unbranded';
@@ -276,14 +257,9 @@ export function Reports() {
       entry.systemCbb += skuSysCbb;
       entry.systemLoosePcs += skuSysLoose;
 
-      totalSysQty += sysPcs;
-      totalSysCbb += skuSysCbb;
-      totalSysLoosePcs += skuSysLoose;
-
       const count = cMap.get(snap.id);
       if (count) {
         entry.countedSkus++;
-        totalCounted++;
         const phyPcs = Number(count.physical_total_pcs) || 0;
         const skuPhyCbb = Math.floor(phyPcs / conv);
         const skuPhyLoose = phyPcs % conv;
@@ -294,59 +270,141 @@ export function Reports() {
         entry.physicalQtyPcs += phyPcs;
         entry.physicalCbb += skuPhyCbb;
         entry.physicalLoosePcs += skuPhyLoose;
+        entry.netVariancePcs += variance;
+
+        if (variance < 0) {
+          entry.shortageCount++;
+        } else if (variance > 0) {
+          entry.excessCount++;
+        } else if (variance === 0 && prevVariance !== 0) {
+          entry.resolvedCount++;
+        }
+      }
+    });
+
+    const bList = Array.from(bMap.values()).map(b => ({
+      ...b,
+      netVarCbb: Math.abs(b.physicalCbb - b.systemCbb),
+      netVarLoosePcs: Math.abs(b.physicalLoosePcs - b.systemLoosePcs),
+    })).sort((a, b) => b.systemQtyPcs - a.systemQtyPcs);
+
+    return {
+      countMap: cMap,
+      brandSummaries: bList,
+    };
+  }, [rawSnapshots, rawCounts, selectedSessionId]);
+
+  // 4b. Identify Completed & Counted Brands
+  const { completedBrandNames, countedBrandNames } = useMemo(() => {
+    const completed = new Set<string>();
+    const counted = new Set<string>();
+
+    // 1. Through SKU counting progress
+    brandSummaries.forEach(b => {
+      if (b.countedSkus > 0) counted.add(b.brand);
+      if (b.totalSkus > 0 && b.countedSkus >= b.totalSkus) {
+        completed.add(b.brand);
+      }
+    });
+
+    // 2. Through stock count session statuses
+    sessions.forEach(s => {
+      const bName = s.brand || s.session_name;
+      if (bName) {
+        if (s.status === 'Completed') {
+          completed.add(bName);
+          counted.add(bName);
+        } else if (s.status === 'In Progress') {
+          counted.add(bName);
+        }
+      }
+    });
+
+    return { completedBrandNames: completed, countedBrandNames: counted };
+  }, [brandSummaries, sessions]);
+
+  // 4c. Compute Scoped Stats according to brandScope and selectedBrand
+  const { scopedStats, categoryCounts } = useMemo(() => {
+    let totalSysQty = 0;
+    let totalPhyQty = 0;
+    let totalSysCbb = 0;
+    let totalSysLoosePcs = 0;
+    let totalPhyCbb = 0;
+    let totalPhyLoosePcs = 0;
+
+    let totalShortageQty = 0;
+    let totalShortageCbb = 0;
+    let totalShortageLoosePcs = 0;
+
+    let totalExcessQty = 0;
+    let totalExcessCbb = 0;
+    let totalExcessLoosePcs = 0;
+
+    let totalShortageCount = 0;
+    let totalExcessCount = 0;
+    let totalCounted = 0;
+    let totalSkus = 0;
+    let newIssuesCount = 0;
+    let increasedVarianceCount = 0;
+
+    rawSnapshots.forEach(snap => {
+      const b = snap.brand || 'Unbranded';
+      if (selectedBrand !== 'All Brands' && b !== selectedBrand) return;
+      if (brandScope === 'completed' && !completedBrandNames.has(b)) return;
+      if (brandScope === 'counted' && !countedBrandNames.has(b)) return;
+
+      totalSkus++;
+      const conv = Number(snap.conversion) > 0 ? Number(snap.conversion) : 1;
+      const sysPcs = Number(snap.system_qty_pcs) || 0;
+      const skuSysCbb = Math.floor(sysPcs / conv);
+      const skuSysLoose = sysPcs % conv;
+
+      totalSysQty += sysPcs;
+      totalSysCbb += skuSysCbb;
+      totalSysLoosePcs += skuSysLoose;
+
+      const count = countMap.get(snap.id);
+      if (count) {
+        totalCounted++;
+        const phyPcs = Number(count.physical_total_pcs) || 0;
+        const skuPhyCbb = Math.floor(phyPcs / conv);
+        const skuPhyLoose = phyPcs % conv;
+
+        const variance = Number(count.variance) || 0;
+        const prevVariance = Number(snap.prev_variance) || 0;
 
         totalPhyQty += phyPcs;
         totalPhyCbb += skuPhyCbb;
         totalPhyLoosePcs += skuPhyLoose;
 
-        entry.netVariancePcs += variance;
-
         if (variance < 0) {
           const absVar = Math.abs(variance);
-          const sCbb = Math.floor(absVar / conv);
-          const sLoose = absVar % conv;
-
-          entry.shortageCount++;
           totalShortageCount++;
           totalShortageQty += absVar;
-          totalShortageCbb += sCbb;
-          totalShortageLoosePcs += sLoose;
+          totalShortageCbb += Math.floor(absVar / conv);
+          totalShortageLoosePcs += absVar % conv;
         } else if (variance > 0) {
-          const eCbb = Math.floor(variance / conv);
-          const eLoose = variance % conv;
-
-          entry.excessCount++;
           totalExcessCount++;
           totalExcessQty += variance;
-          totalExcessCbb += eCbb;
-          totalExcessLoosePcs += eLoose;
-        } else if (variance === 0 && prevVariance !== 0) {
-          entry.resolvedCount++;
+          totalExcessCbb += Math.floor(variance / conv);
+          totalExcessLoosePcs += variance % conv;
         }
 
-        if (prevVariance === 0 && variance !== 0) {
-          newIssuesCount++;
-        }
-        if (Math.abs(variance) > Math.abs(prevVariance) && variance !== 0) {
-          increasedVarianceCount++;
-        }
+        if (prevVariance === 0 && variance !== 0) newIssuesCount++;
+        if (Math.abs(variance) > Math.abs(prevVariance) && variance !== 0) increasedVarianceCount++;
       }
     });
 
-    const bList = Array.from(bMap.values()).map(b => {
-      const netAbs = Math.abs(b.netVariancePcs);
-      return {
-        ...b,
-        netVarCbb: Math.abs(b.physicalCbb - b.systemCbb),
-        netVarLoosePcs: Math.abs(b.physicalLoosePcs - b.systemLoosePcs),
-      };
-    }).sort((a, b) => b.systemQtyPcs - a.systemQtyPcs);
+    const scopedBrandsCount = brandSummaries.filter(b => {
+      if (selectedBrand !== 'All Brands' && b.brand !== selectedBrand) return false;
+      if (brandScope === 'completed' && !completedBrandNames.has(b.brand)) return false;
+      if (brandScope === 'counted' && !countedBrandNames.has(b.brand)) return false;
+      return true;
+    }).length;
 
     return {
-      countMap: cMap,
-      brandSummaries: bList,
-      overallStats: {
-        totalSkus: rawSnapshots.length,
+      scopedStats: {
+        totalSkus,
         countedSkus: totalCounted,
         systemCbb: totalSysCbb,
         systemLoosePcs: totalSysLoosePcs,
@@ -367,22 +425,27 @@ export function Reports() {
         excessItems: totalExcessCount,
       },
       categoryCounts: {
-        full: rawSnapshots.length,
+        full: totalSkus,
         shortage: totalShortageCount,
         excess: totalExcessCount,
-        brand_summary: bList.length,
+        brand_summary: scopedBrandsCount,
         new_issues: newIssuesCount,
         increased_variance: increasedVarianceCount,
         historical_comparison: comparisonRows.length,
       },
     };
-  }, [rawSnapshots, rawCounts, selectedSessionId, comparisonRows.length]);
+  }, [rawSnapshots, countMap, brandSummaries, selectedBrand, brandScope, completedBrandNames, countedBrandNames, comparisonRows.length]);
 
   // 5. Generate active report records (All system, physical, and difference values formatted as CBB & PCS)
   const activeReportRows = useMemo(() => {
     if (activeReportType === 'brand_summary') {
       return brandSummaries
-        .filter((b: BrandSummaryItem) => selectedBrand === 'All Brands' || b.brand === selectedBrand)
+        .filter((b: BrandSummaryItem) => {
+          if (selectedBrand !== 'All Brands' && b.brand !== selectedBrand) return false;
+          if (brandScope === 'completed' && !completedBrandNames.has(b.brand)) return false;
+          if (brandScope === 'counted' && !countedBrandNames.has(b.brand)) return false;
+          return true;
+        })
         .map((b: BrandSummaryItem) => ({
           'Brand': b.brand,
           'Total SKUs': b.totalSkus,
@@ -401,30 +464,41 @@ export function Reports() {
     }
 
     if (activeReportType === 'historical_comparison') {
-      return comparisonRows.map(r => {
-        const conv = r.conversion || 1;
-        const diffBreakdown = calculateCbbPcs(r.deltaCount, conv, true);
-        return {
-          'Material': r.material,
-          'Description': r.description,
-          'Brand': r.brand,
-          'MRP (₹)': r.mrp,
-          'Case Size (1 CBB)': `${conv} PCS`,
-          'Upload A Sys (PCS)': r.sysA,
-          'Upload A Phy (PCS)': r.phyA,
-          'Upload A Var (PCS)': r.varA,
-          'Upload B Sys (PCS)': r.sysB,
-          'Upload B Phy (PCS)': r.phyB,
-          'Upload B Var (PCS)': r.varB,
-          'Delta Difference (CBB & PCS)': diffBreakdown.formatted,
-          'Delta Count (PCS)': r.deltaCount,
-        };
-      });
+      return comparisonRows
+        .filter(r => {
+          if (selectedBrand !== 'All Brands' && r.brand !== selectedBrand) return false;
+          if (brandScope === 'completed' && !completedBrandNames.has(r.brand)) return false;
+          if (brandScope === 'counted' && !countedBrandNames.has(r.brand)) return false;
+          return true;
+        })
+        .map(r => {
+          const conv = r.conversion || 1;
+          const diffBreakdown = calculateCbbPcs(r.deltaCount, conv, true);
+          return {
+            'Material': r.material,
+            'Description': r.description,
+            'Brand': r.brand,
+            'MRP (₹)': r.mrp,
+            'Case Size (1 CBB)': `${conv} PCS`,
+            'Upload A Sys (PCS)': r.sysA,
+            'Upload A Phy (PCS)': r.phyA,
+            'Upload A Var (PCS)': r.varA,
+            'Upload B Sys (PCS)': r.sysB,
+            'Upload B Phy (PCS)': r.phyB,
+            'Upload B Var (PCS)': r.varB,
+            'Delta Difference (CBB & PCS)': diffBreakdown.formatted,
+            'Delta Count (PCS)': r.deltaCount,
+          };
+        });
     }
 
     const rows: any[] = [];
     rawSnapshots.forEach(snap => {
-      if (selectedBrand !== 'All Brands' && snap.brand !== selectedBrand) return;
+      const b = snap.brand || 'Unbranded';
+      if (selectedBrand !== 'All Brands' && b !== selectedBrand) return;
+      if (brandScope === 'completed' && !completedBrandNames.has(b)) return;
+      if (brandScope === 'counted' && !countedBrandNames.has(b)) return;
+
       const count = countMap.get(snap.id);
       const mrp = Number(snap.mrp) || 0;
       const conv = Number(snap.conversion) > 0 ? Number(snap.conversion) : 1;
@@ -475,7 +549,7 @@ export function Reports() {
     });
 
     return rows;
-  }, [activeReportType, rawSnapshots, countMap, brandSummaries, comparisonRows, selectedBrand]);
+  }, [activeReportType, rawSnapshots, countMap, brandSummaries, comparisonRows, selectedBrand, brandScope, completedBrandNames, countedBrandNames]);
 
   // 6. Search filtering on active preview rows
   const filteredPreviewRows = useMemo(() => {
@@ -502,10 +576,11 @@ export function Reports() {
     setDownloadingType('excel');
     try {
       if (!activeReportRows || activeReportRows.length === 0) {
-        showAlert('No records available in this report to export.', 'info', 'No Data');
+        showAlert('No records available in this report scope to export.', 'info', 'No Data');
         return;
       }
-      exportDataToExcel(activeReportRows, activeReportType, `Stock_${activeReportType}`);
+      const scopePrefix = brandScope === 'completed' ? 'Completed_' : brandScope === 'counted' ? 'Counted_' : '';
+      exportDataToExcel(activeReportRows, activeReportType, `Stock_${scopePrefix}${activeReportType}`);
       showAlert(`Successfully generated Excel export for ${REPORT_CONFIG[activeReportType]?.title || activeReportType}.`, 'success', 'Export Ready');
     } catch (e) {
       console.error(e);
@@ -515,15 +590,30 @@ export function Reports() {
     }
   };
 
-  const handleExportPdf = () => {
+  const handleExportPdf = (scopeOverride?: 'completed') => {
     setDownloadingType('pdf');
     try {
-      if (!activeReportRows || activeReportRows.length === 0) {
-        showAlert('No records available in this report to print.', 'info', 'No Data');
+      let rowsToExport = activeReportRows;
+      let statsToExport = scopedStats;
+      const isCompleted = scopeOverride === 'completed' || brandScope === 'completed';
+
+      if (scopeOverride === 'completed' && brandScope !== 'completed') {
+        rowsToExport = activeReportRows.filter((r: any) => completedBrandNames.has(r['Brand'] || ''));
+      }
+
+      if (!rowsToExport || rowsToExport.length === 0) {
+        showAlert('No records available in this scope to print.', 'info', 'No Data');
         return;
       }
-      const title = REPORT_CONFIG[activeReportType]?.pdfTitle || 'Stock Audit Report';
-      exportReportToPdf(activeReportRows, title, overallStats, agencyName);
+
+      const scopeSuffix = isCompleted
+        ? ' (Completed Brands Only)'
+        : brandScope === 'counted'
+        ? ' (Counted Brands Only)'
+        : '';
+
+      const title = `${REPORT_CONFIG[activeReportType]?.pdfTitle || 'Stock Audit Report'}${scopeSuffix}`;
+      exportReportToPdf(rowsToExport, title, statsToExport, agencyName);
       showAlert(`PDF document generated for ${REPORT_CONFIG[activeReportType]?.title || activeReportType}.`, 'success', 'PDF Ready');
     } catch (e) {
       console.error(e);
@@ -531,6 +621,15 @@ export function Reports() {
     } finally {
       setDownloadingType(null);
     }
+  };
+
+  // Dedicated direct 1-click exporter for completed brands
+  const handleExportCompletedPdf = () => {
+    if (completedBrandNames.size === 0) {
+      showAlert('No brands have fully completed stock checks yet for this upload. Brands appear here once all SKUs are counted or session is marked Completed.', 'warning', 'No Completed Brands');
+      return;
+    }
+    handleExportPdf('completed');
   };
 
   // Report configuration metadata
@@ -635,13 +734,40 @@ export function Reports() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-      {/* 1. Header */}
+      {/* 1. Header with Direct Completed Brands PDF Export */}
       <PageHeader
         title="Stock Audit Reports & Export Hub"
         description="Unified analytics hub: preview discrepancies in real-time, inspect CBB and PCS quantities, and export verified Excel or PDF reports"
         icon={FileSpreadsheet}
         actions={
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            {/* Quick 1-Click PDF export for completed brands */}
+            <button
+              onClick={handleExportCompletedPdf}
+              disabled={downloadingType === 'pdf'}
+              style={{
+                padding: '10px 16px',
+                borderRadius: 10,
+                border: '1.5px solid #bbf7d0',
+                background: '#f0fdf4',
+                color: '#166534',
+                fontSize: 13,
+                fontWeight: 700,
+                cursor: downloadingType === 'pdf' ? 'not-allowed' : 'pointer',
+                fontFamily: 'inherit',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                boxShadow: '0 2px 6px rgba(22, 101, 52, 0.08)',
+                transition: 'all 0.15s ease',
+              }}
+              title="Download PDF containing only brands where stock check is complete"
+            >
+              <CheckCircle2 size={15} color="#16a34a" />
+              Download Completed Brands PDF ({completedBrandNames.size})
+            </button>
+
+            {/* Print Active View PDF */}
             <button
               onClick={() => handleExportPdf()}
               disabled={downloadingType === 'pdf'}
@@ -662,13 +788,13 @@ export function Reports() {
                 transition: 'all 0.15s ease',
               }}
             >
-              <Download size={15} /> Print Active PDF
+              <Download size={15} /> Print Active View PDF
             </button>
           </div>
         }
       />
 
-      {/* 2. Control Filter Panel */}
+      {/* 2. Control Filter Panel with Brand Scope Switcher */}
       <div style={{ ...CARD_BOX, padding: '16px 20px', display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 14 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
           {/* Select Upload */}
@@ -697,7 +823,87 @@ export function Reports() {
             </select>
           </div>
 
-          {/* Select Brand Filter */}
+          {/* Audit Scope Switcher (All vs Completed Only vs Counted Only) */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 3, background: '#f1f5f9', padding: 3, borderRadius: 9, border: '1px solid #e2e8f0' }}>
+            <button
+              onClick={() => { setBrandScope('all'); setSelectedBrand('All Brands'); }}
+              style={{
+                padding: '6px 11px',
+                borderRadius: 7,
+                border: 'none',
+                background: brandScope === 'all' ? '#ffffff' : 'transparent',
+                color: brandScope === 'all' ? '#0f172a' : '#64748b',
+                fontSize: 12,
+                fontWeight: 700,
+                cursor: 'pointer',
+                boxShadow: brandScope === 'all' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 5,
+                fontFamily: 'inherit',
+              }}
+            >
+              <Globe size={13} color={brandScope === 'all' ? '#4f46e5' : '#64748b'} />
+              <span>All Brands</span>
+              <span style={{ fontSize: 10, fontWeight: 700, background: brandScope === 'all' ? '#eef2ff' : '#e2e8f0', color: brandScope === 'all' ? '#4338ca' : '#64748b', padding: '1px 6px', borderRadius: 9999 }}>
+                {uniqueBrands.length}
+              </span>
+            </button>
+
+            <button
+              onClick={() => { setBrandScope('completed'); setSelectedBrand('All Brands'); }}
+              style={{
+                padding: '6px 11px',
+                borderRadius: 7,
+                border: 'none',
+                background: brandScope === 'completed' ? '#ffffff' : 'transparent',
+                color: brandScope === 'completed' ? '#166534' : '#64748b',
+                fontSize: 12,
+                fontWeight: 700,
+                cursor: 'pointer',
+                boxShadow: brandScope === 'completed' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 5,
+                fontFamily: 'inherit',
+              }}
+              title="Show only brands where daily stock check is 100% complete"
+            >
+              <CheckCircle2 size={13} color="#16a34a" />
+              <span>Completed Only</span>
+              <span style={{ fontSize: 10, fontWeight: 700, background: brandScope === 'completed' ? '#dcfce7' : '#e2e8f0', color: brandScope === 'completed' ? '#166534' : '#64748b', padding: '1px 6px', borderRadius: 9999 }}>
+                {completedBrandNames.size}
+              </span>
+            </button>
+
+            <button
+              onClick={() => { setBrandScope('counted'); setSelectedBrand('All Brands'); }}
+              style={{
+                padding: '6px 11px',
+                borderRadius: 7,
+                border: 'none',
+                background: brandScope === 'counted' ? '#ffffff' : 'transparent',
+                color: brandScope === 'counted' ? '#4338ca' : '#64748b',
+                fontSize: 12,
+                fontWeight: 700,
+                cursor: 'pointer',
+                boxShadow: brandScope === 'counted' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 5,
+                fontFamily: 'inherit',
+              }}
+              title="Show brands that have any physical count recorded today"
+            >
+              <ListChecks size={13} color="#6366f1" />
+              <span>Counted</span>
+              <span style={{ fontSize: 10, fontWeight: 700, background: brandScope === 'counted' ? '#eef2ff' : '#e2e8f0', color: brandScope === 'counted' ? '#4338ca' : '#64748b', padding: '1px 6px', borderRadius: 9999 }}>
+                {countedBrandNames.size}
+              </span>
+            </button>
+          </div>
+
+          {/* Select Specific Brand Filter */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <Building2 size={15} color="#64748b" />
             <select
@@ -712,10 +918,28 @@ export function Reports() {
                 color: '#0f172a',
                 background: '#fff',
                 outline: 'none',
+                maxWidth: 180,
               }}
             >
-              <option value="All Brands">All Brands ({uniqueBrands.length})</option>
-              {uniqueBrands.map((b: string) => <option key={b} value={b}>{b}</option>)}
+              <option value="All Brands">
+                {brandScope === 'completed'
+                  ? `All Completed (${completedBrandNames.size})`
+                  : brandScope === 'counted'
+                  ? `All Counted (${countedBrandNames.size})`
+                  : `All Brands (${uniqueBrands.length})`}
+              </option>
+              {uniqueBrands
+                .filter(b => {
+                  if (brandScope === 'completed') return completedBrandNames.has(b);
+                  if (brandScope === 'counted') return countedBrandNames.has(b);
+                  return true;
+                })
+                .map((b: string) => {
+                  const isComp = completedBrandNames.has(b);
+                  const isCnt = countedBrandNames.has(b);
+                  const tag = isComp ? ' ✓ Done' : isCnt ? ' ⏸ Active' : '';
+                  return <option key={b} value={b}>{b}{tag}</option>;
+                })}
             </select>
           </div>
 
@@ -804,33 +1028,33 @@ export function Reports() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: 14 }}>
         {[
           {
-            label: 'Total SKUs',
-            value: overallStats.totalSkus,
-            sub: `${overallStats.countedSkus} Counted in Session`,
+            label: 'Total SKUs in Scope',
+            value: scopedStats.totalSkus,
+            sub: `${scopedStats.countedSkus} Counted (${brandScope === 'completed' ? 'Completed Brands' : brandScope === 'counted' ? 'Counted Brands' : 'All Brands'})`,
             color: '#4f46e5',
           },
           {
             label: 'System Book Stock',
-            value: `${overallStats.systemCbb.toLocaleString('en-IN')} CBB + ${overallStats.systemLoosePcs.toLocaleString('en-IN')} PCS`,
-            sub: `${overallStats.systemQtyPcs.toLocaleString('en-IN')} PCS Total Book Stock`,
+            value: `${scopedStats.systemCbb.toLocaleString('en-IN')} CBB + ${scopedStats.systemLoosePcs.toLocaleString('en-IN')} PCS`,
+            sub: `${scopedStats.systemQtyPcs.toLocaleString('en-IN')} PCS Total Book Stock`,
             color: '#64748b',
           },
           {
             label: 'Physical Audited Stock',
-            value: `${overallStats.physicalCbb.toLocaleString('en-IN')} CBB + ${overallStats.physicalLoosePcs.toLocaleString('en-IN')} PCS`,
-            sub: `${overallStats.physicalQtyPcs.toLocaleString('en-IN')} PCS Total Audited`,
+            value: `${scopedStats.physicalCbb.toLocaleString('en-IN')} CBB + ${scopedStats.physicalLoosePcs.toLocaleString('en-IN')} PCS`,
+            sub: `${scopedStats.physicalQtyPcs.toLocaleString('en-IN')} PCS Total Audited`,
             color: '#10b981',
           },
           {
             label: 'Shortage Discrepancy',
-            value: `${overallStats.shortageCbb.toLocaleString('en-IN')} CBB + ${overallStats.shortageLoosePcs.toLocaleString('en-IN')} PCS`,
-            sub: `${overallStats.shortageQtyPcs.toLocaleString('en-IN')} PCS Short (${overallStats.shortageItems} SKUs)`,
+            value: `${scopedStats.shortageCbb.toLocaleString('en-IN')} CBB + ${scopedStats.shortageLoosePcs.toLocaleString('en-IN')} PCS`,
+            sub: `${scopedStats.shortageQtyPcs.toLocaleString('en-IN')} PCS Short (${scopedStats.shortageItems} SKUs)`,
             color: '#ef4444',
           },
           {
             label: 'Excess Surplus Stock',
-            value: `${overallStats.excessCbb.toLocaleString('en-IN')} CBB + ${overallStats.excessLoosePcs.toLocaleString('en-IN')} PCS`,
-            sub: `${overallStats.excessQtyPcs.toLocaleString('en-IN')} PCS Excess (${overallStats.excessItems} SKUs)`,
+            value: `${scopedStats.excessCbb.toLocaleString('en-IN')} CBB + ${scopedStats.excessLoosePcs.toLocaleString('en-IN')} PCS`,
+            sub: `${scopedStats.excessQtyPcs.toLocaleString('en-IN')} PCS Excess (${scopedStats.excessItems} SKUs)`,
             color: '#f59e0b',
           },
         ].map(k => (
@@ -961,8 +1185,8 @@ export function Reports() {
             }}
           >
             {/* Active Report Title & Description */}
-            <div style={{ maxWidth: 440 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
+            <div style={{ maxWidth: 460 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
                 <span
                   style={{
                     width: 10,
@@ -987,6 +1211,18 @@ export function Reports() {
                 >
                   {filteredPreviewRows.length} of {activeReportRows.length} rows
                 </span>
+
+                {/* Scope Indicator Badge */}
+                {brandScope === 'completed' && (
+                  <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 12, background: '#dcfce7', color: '#166534', border: '1px solid #bbf7d0', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                    <CheckCircle2 size={11} /> Completed Brands Only ({completedBrandNames.size})
+                  </span>
+                )}
+                {brandScope === 'counted' && (
+                  <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 12, background: '#eef2ff', color: '#4338ca', border: '1px solid #c7d2fe', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                    <ListChecks size={11} /> Counted Brands ({countedBrandNames.size})
+                  </span>
+                )}
               </div>
               <p style={{ fontSize: 12, color: '#64748b', margin: 0, lineHeight: 1.4 }}>
                 {currentConfig.desc}
@@ -1005,7 +1241,7 @@ export function Reports() {
                   background: '#f8fafc',
                   border: '1px solid #e2e8f0',
                   borderRadius: 8,
-                  width: 250,
+                  width: 240,
                 }}
               >
                 <Search size={14} color="#94a3b8" />
@@ -1037,7 +1273,7 @@ export function Reports() {
                 )}
               </div>
 
-              {/* Export Excel Button */}
+              {/* Export Excel Button (Exports active scope) */}
               <button
                 onClick={handleExportExcel}
                 disabled={downloadingType === 'excel' || activeReportRows.length === 0}
@@ -1056,6 +1292,7 @@ export function Reports() {
                   gap: 6,
                   transition: 'all 0.15s ease',
                 }}
+                title={brandScope === 'completed' ? 'Export Excel for Completed Brands only' : 'Export Excel for current view'}
               >
                 <FileSpreadsheet size={15} color="#16a34a" />
                 {downloadingType === 'excel' ? 'Exporting...' : 'Export Excel (.xlsx)'}
@@ -1063,7 +1300,7 @@ export function Reports() {
 
               {/* Download PDF Button */}
               <button
-                onClick={handleExportPdf}
+                onClick={() => handleExportPdf()}
                 disabled={downloadingType === 'pdf' || activeReportRows.length === 0}
                 style={{
                   padding: '8px 16px',
@@ -1108,18 +1345,38 @@ export function Reports() {
                     <tr>
                       <td colSpan={6} style={{ padding: 48, textAlign: 'center', color: '#64748b' }}>
                         <Building2 size={36} color="#cbd5e1" style={{ margin: '0 auto 8px', display: 'block' }} />
-                        <p style={{ fontWeight: 600, margin: '0 0 4px', color: '#334155' }}>No brands found</p>
-                        <p style={{ fontSize: 12, margin: 0 }}>Try clearing your search query or brand filter.</p>
+                        <p style={{ fontWeight: 600, margin: '0 0 4px', color: '#334155' }}>
+                          {brandScope === 'completed'
+                            ? 'No brands have fully completed stock checks yet'
+                            : brandScope === 'counted'
+                            ? 'No brands have recorded counts yet'
+                            : 'No brands found'}
+                        </p>
+                        <p style={{ fontSize: 12, margin: 0 }}>
+                          {brandScope === 'completed'
+                            ? 'Brands will appear here automatically once 100% of their SKUs are counted or session is marked Completed.'
+                            : 'Try switching to All Brands or clearing your search filter.'}
+                        </p>
                       </td>
                     </tr>
                   ) : (
                     filteredPreviewRows.map((b: any) => {
                       const pct = b['Total SKUs'] > 0 ? Math.round((b['Counted SKUs'] / b['Total SKUs']) * 100) : 0;
                       const netVar = Number(b['Net Variance (PCS)']) || 0;
+                      const isComplete = completedBrandNames.has(b['Brand']);
 
                       return (
                         <tr key={b['Brand']} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                          <td style={{ padding: '12px 16px', fontWeight: 700, color: '#0f172a' }}>{b['Brand']}</td>
+                          <td style={{ padding: '12px 16px', fontWeight: 700, color: '#0f172a' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                              <span>{b['Brand']}</span>
+                              {isComplete && (
+                                <span style={{ fontSize: 10, background: '#dcfce7', color: '#166534', padding: '1px 5px', borderRadius: 4, fontWeight: 700 }}>
+                                  ✓ Done
+                                </span>
+                              )}
+                            </div>
+                          </td>
                           <td style={{ padding: '12px 16px' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                               <div style={{ width: 80, height: 6, background: '#e2e8f0', borderRadius: 9999, overflow: 'hidden' }}>
@@ -1193,7 +1450,7 @@ export function Reports() {
                       <td colSpan={7} style={{ padding: 48, textAlign: 'center', color: '#64748b' }}>
                         <History size={36} color="#cbd5e1" style={{ margin: '0 auto 8px', display: 'block' }} />
                         <p style={{ fontWeight: 600, margin: '0 0 4px', color: '#334155' }}>
-                          {!compareUploadId ? 'Select a secondary snapshot above to compare' : 'No matching materials found'}
+                          {!compareUploadId ? 'Select a secondary snapshot above to compare' : 'No matching materials found in this scope'}
                         </p>
                         <p style={{ fontSize: 12, margin: 0 }}>Comparison tracks count delta changes between two physical inventory dates.</p>
                       </td>
@@ -1267,6 +1524,8 @@ export function Reports() {
                         <p style={{ fontWeight: 700, fontSize: 15, margin: '0 0 4px', color: '#0f172a' }}>
                           {searchQuery
                             ? 'No materials match your search query'
+                            : brandScope === 'completed'
+                            ? 'No records in Completed Brands scope'
                             : activeReportType === 'shortage'
                             ? 'No shortage discrepancies found!'
                             : activeReportType === 'excess'
@@ -1278,7 +1537,9 @@ export function Reports() {
                             : 'No records available in this report.'}
                         </p>
                         <p style={{ fontSize: 12, margin: 0, color: '#64748b' }}>
-                          {searchQuery
+                          {brandScope === 'completed'
+                            ? 'Complete stock counts for at least one brand or switch to "All Brands" or "Counted".'
+                            : searchQuery
                             ? 'Try clearing the search filter or switching to All Brands.'
                             : 'All counted items currently meet or exceed system baseline specifications.'}
                         </p>
