@@ -91,7 +91,8 @@ export function StockCount() {
             .from('system_stock_snapshots')
             .select('id, upload_id, material, material_desc, brand, mrp, good_qty, conversion, system_qty_pcs, prev_variance')
             .eq('upload_id', activeUploadId)
-            .eq('brand', targetBrand),
+            .eq('brand', targetBrand)
+            .order('material', { ascending: true }),
           supabase
             .from('physical_stock_counts')
             .select('id, session_id, snapshot_id, physical_cbb, physical_pcs, physical_total_pcs, variance, status, notes, reason_code')
@@ -120,9 +121,18 @@ export function StockCount() {
           };
         });
 
-        setAllProducts(merged);
-        if (merged.length > 0) {
-          setSelectedProductId(merged[0].id);
+        // Ensure products are consistently sorted in natural alphanumeric order by material code
+        const sortedMerged = [...merged].sort((a, b) =>
+          a.material.localeCompare(b.material, undefined, { numeric: true })
+        );
+
+        setAllProducts(sortedMerged);
+        if (sortedMerged.length > 0) {
+          // For a new session, all items are uncounted so it starts at item 0 (first item).
+          // If resuming an ongoing session, start at the first uncounted item, or item 0 if all are counted.
+          const firstUncounted = sortedMerged.find(p => p.existingCbb === '' && p.existingPcs === '');
+          const initialProduct = firstUncounted || sortedMerged[0];
+          setSelectedProductId(initialProduct.id);
         }
       } catch (e) {
         console.error('Error loading session:', e);
@@ -166,7 +176,7 @@ export function StockCount() {
         if (sortQueue === 'Highest Variance') {
           return Math.abs(b.prev_variance || 0) - Math.abs(a.prev_variance || 0);
         }
-        return a.material.localeCompare(b.material);
+        return a.material.localeCompare(b.material, undefined, { numeric: true });
       });
   }, [allProducts, deferredSearchQuery, hideCounted, issuesOnly, sortQueue]);
 
@@ -396,9 +406,22 @@ export function StockCount() {
                 return (
                   <div key={p.id} onClick={() => { setSelectedProductId(p.id); setMobileListOpen(false); }}
                     style={{ padding: '8px 10px', borderRadius: 6, marginBottom: 4, background: active ? '#eef2ff' : 'transparent', borderLeft: `3px solid ${isCounted ? sc.border : 'transparent'}`, cursor: 'pointer' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, fontWeight: 700, color: active ? '#4f46e5' : '#475569', marginBottom: 2 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 10, fontWeight: 700, color: active ? '#4f46e5' : '#475569', marginBottom: 2 }}>
                       <span>{p.material}</span>
-                      {isCounted && <span>{p.existingStatus}</span>}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                        <span style={{
+                          fontSize: 10,
+                          fontWeight: 800,
+                          background: active ? '#fef08a' : '#fef9c3',
+                          color: '#854d0e',
+                          padding: '1px 5px',
+                          borderRadius: 4,
+                          border: '1px solid #fde047'
+                        }}>
+                          ₹{p.mrp}
+                        </span>
+                        {isCounted && <span>{p.existingStatus}</span>}
+                      </div>
                     </div>
                     <p style={{ fontSize: 11, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.material_desc}</p>
                   </div>
@@ -463,9 +486,22 @@ export function StockCount() {
                     onMouseEnter={e => { if (!active) (e.currentTarget as HTMLElement).style.background = '#f8fafc'; }}
                     onMouseLeave={e => { if (!active) (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
                   >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 6, marginBottom: 2 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6, marginBottom: 2 }}>
                       <span style={{ fontSize: 11, fontWeight: 700, color: active ? '#4f46e5' : '#475569', fontFamily: 'monospace' }}>{p.material}</span>
-                      {isCounted && <span style={{ fontSize: 9, fontWeight: 800, color: sc.color }}>{p.existingStatus}</span>}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                        <span style={{
+                          fontSize: 11,
+                          fontWeight: 800,
+                          background: active ? '#fef08a' : '#fef9c3',
+                          color: '#854d0e',
+                          padding: '1px 6px',
+                          borderRadius: 4,
+                          border: '1px solid #fde047'
+                        }}>
+                          ₹{p.mrp}
+                        </span>
+                        {isCounted && <span style={{ fontSize: 9, fontWeight: 800, color: sc.color }}>{p.existingStatus}</span>}
+                      </div>
                     </div>
                     <p style={{ fontSize: 12, fontWeight: active ? 600 : 500, color: '#1e293b', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {p.material_desc}
@@ -493,34 +529,81 @@ export function StockCount() {
           ) : (
             <div style={{ ...W, padding: '24px 28px', display: 'flex', flexDirection: 'column', gap: 20 }}>
               
-              {/* Product Info with Britannia Packshot */}
-              <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', justifyContent: 'space-between' }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 6 }}>
-                    <span style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Item {currentIndex + 1} of {filteredProducts.length}</span>
-                    <span className="brit-badge-mrp">MRP ₹{currentProduct.mrp}</span>
+              {/* Product Info with Britannia Packshot & Prominent High-Visibility MRP */}
+              <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap' }}>
+                <div style={{ flex: '1 1 240px', minWidth: 220 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8, flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                      Item {currentIndex + 1} of {filteredProducts.length}
+                    </span>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: '#e52321', fontFamily: 'monospace', background: '#fef2f2', padding: '2px 8px', borderRadius: 6, border: '1px solid #fecaca' }}>
+                      SKU {currentProduct.material}
+                    </span>
                   </div>
-                  <h2 style={{ fontSize: 20, fontWeight: 800, color: '#0f172a', margin: '0 0 10px', lineHeight: 1.3 }}>{currentProduct.material_desc}</h2>
-                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: 11, fontWeight: 700, color: '#e52321', fontFamily: 'monospace', background: '#fef2f2', padding: '3px 8px', borderRadius: 6, border: '1px solid #fecaca' }}>SKU {currentProduct.material}</span>
-                    <span style={{ fontSize: 11, fontWeight: 600, color: '#4b5563', background: '#f3f4f6', padding: '3px 8px', borderRadius: 6 }}>1 Case (CBB) = {currentProduct.conversion} PCS</span>
+                  <h2 style={{ fontSize: 22, fontWeight: 800, color: '#0f172a', margin: '0 0 10px', lineHeight: 1.3 }}>
+                    {currentProduct.material_desc}
+                  </h2>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: '#4b5563', background: '#f3f4f6', padding: '3px 10px', borderRadius: 6 }}>
+                      1 Case (CBB) = {currentProduct.conversion} PCS
+                    </span>
                   </div>
                 </div>
 
-                {/* Official Packshot Preview */}
-                <div style={{
-                  width: 72, height: 72, padding: 6, borderRadius: 14, background: '#fff',
-                  border: '1px solid #e2e8f0', boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
-                }}>
-                  <img
-                    src={getBritanniaBrandImage(brandName || currentProduct.material_desc)}
-                    alt={brandName}
-                    style={{ maxHeight: 60, maxWidth: 60, objectFit: 'contain', filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.08))' }}
-                    onError={(e) => {
-                      (e.currentTarget as HTMLImageElement).src = getBritanniaFallbackCDN(brandName || currentProduct.material_desc);
-                    }}
-                  />
+                {/* Right side: High-Visibility Big MRP Callout & Official Packshot */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
+                  {/* Big High-Visibility MRP Showcase Card */}
+                  <div style={{
+                    background: 'linear-gradient(135deg, #fef9c3 0%, #fef08a 45%, #fde047 100%)',
+                    border: '2px solid #eab308',
+                    borderRadius: 14,
+                    padding: '8px 16px',
+                    textAlign: 'center',
+                    boxShadow: '0 4px 14px rgba(234, 179, 8, 0.28)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    minWidth: 88,
+                  }}>
+                    <span style={{
+                      fontSize: 11,
+                      fontWeight: 800,
+                      color: '#854d0e',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.08em',
+                      lineHeight: 1,
+                      marginBottom: 3
+                    }}>
+                      MRP
+                    </span>
+                    <span style={{
+                      fontSize: 28,
+                      fontWeight: 900,
+                      color: '#0f172a',
+                      lineHeight: 1.1,
+                      letterSpacing: '-0.02em',
+                      fontFamily: "'Outfit', 'Inter', sans-serif"
+                    }}>
+                      ₹{currentProduct.mrp}
+                    </span>
+                  </div>
+
+                  {/* Official Packshot Preview */}
+                  <div style={{
+                    width: 74, height: 74, padding: 6, borderRadius: 14, background: '#fff',
+                    border: '1px solid #e2e8f0', boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center'
+                  }}>
+                    <img
+                      src={getBritanniaBrandImage(brandName || currentProduct.material_desc)}
+                      alt={brandName}
+                      style={{ maxHeight: 62, maxWidth: 62, objectFit: 'contain', filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.08))' }}
+                      onError={(e) => {
+                        (e.currentTarget as HTMLImageElement).src = getBritanniaFallbackCDN(brandName || currentProduct.material_desc);
+                      }}
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -645,10 +728,14 @@ export function StockCount() {
                       <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', margin: 0 }}>{liveStatus}</p>
                       <p style={{ fontSize: 18, fontWeight: 800, margin: 0 }}>{Math.abs(liveVariance)} PCS</p>
                     </div>
-                    <div style={{ textAlign: 'right' }}>
-                      <p style={{ fontSize: 10, fontWeight: 600, margin: 0, opacity: 0.8 }}>Impact</p>
-                      <p style={{ fontSize: 13, fontWeight: 700, margin: 0 }}>₹{Math.round(Math.abs(liveVariance * currentProduct.mrp)).toLocaleString('en-IN')}</p>
-                    </div>
+                    {liveStatus !== 'Equal' && currentProduct.conversion > 1 && (
+                      <div style={{ textAlign: 'right' }}>
+                        <p style={{ fontSize: 10, fontWeight: 600, margin: 0, opacity: 0.8 }}>Case Breakdown</p>
+                        <p style={{ fontSize: 13, fontWeight: 700, margin: 0 }}>
+                          {Math.floor(Math.abs(liveVariance) / currentProduct.conversion)} CBB + {Math.abs(liveVariance) % currentProduct.conversion} PCS
+                        </p>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

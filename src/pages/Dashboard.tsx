@@ -63,8 +63,7 @@ export function Dashboard() {
                 desc: snap.material_desc,
                 brand: snap.brand,
                 type: c.status,
-                variance: c.variance,
-                impact: Math.round(Math.abs(c.variance) * (snap.mrp || 0))
+                variance: c.variance
               });
             }
           }
@@ -221,7 +220,7 @@ export function Dashboard() {
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
               <thead>
                 <tr style={{ background: '#f8fafc', borderBottom: '1px solid #f1f5f9' }}>
-                  {['Material', 'Brand', 'Status', 'Variance', 'Value Impact'].map((h, i) => (
+                  {['Material', 'Brand', 'Status', 'Variance (PCS)'].map((h, i) => (
                     <th key={h} style={{ padding: '10px 20px', fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.07em', textAlign: i >= 2 ? 'center' : 'left' }}>{h}</th>
                   ))}
                 </tr>
@@ -241,9 +240,8 @@ export function Dashboard() {
                       <StatusBadge status={issue.type} />
                     </td>
                     <td style={{ padding: '13px 20px', textAlign: 'center', fontWeight: 800, color: issue.variance < 0 ? '#dc2626' : '#d97706', fontSize: 14 }}>
-                      {issue.variance > 0 ? '+' : ''}{issue.variance}
+                      {issue.variance > 0 ? '+' : ''}{issue.variance} PCS
                     </td>
-                    <td style={{ padding: '13px 20px', textAlign: 'center', fontWeight: 700, color: '#0f172a', fontSize: 13 }}>₹{issue.impact.toLocaleString('en-IN')}</td>
                   </tr>
                 ))}
               </tbody>

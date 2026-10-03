@@ -371,17 +371,18 @@
 
   /* Britannia MRP Badge */
   .brit-badge-mrp {
-    background-color: #ffc800;
+    background: linear-gradient(135deg, #fef9c3 0%, #fde047 100%);
     color: #0f172a;
     font-weight: 800;
-    padding: 3px 9px;
-    border-radius: 9999px;
-    font-size: 11px;
-    letter-spacing: 0.04em;
+    padding: 4px 10px;
+    border-radius: 8px;
+    font-size: 12px;
+    letter-spacing: 0.02em;
     display: inline-flex;
     align-items: center;
-    gap: 3px;
-    box-shadow: 0 2px 4px rgba(255, 200, 0, 0.3);
+    gap: 4px;
+    border: 1.5px solid #eab308;
+    box-shadow: 0 2px 4px rgba(234, 179, 8, 0.25);
   }
 
   /* Britannia Green Indicator */

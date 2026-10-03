@@ -28,7 +28,7 @@ export function Issues() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [brand, setBrand] = useState('All');
-  const [sort, setSort] = useState<'variance' | 'value'>('variance');
+  const [sort, setSort] = useState<'variance' | 'material'>('variance');
   const [brands, setBrands] = useState<string[]>([]);
 
   const fetchIssues = async () => {
@@ -112,9 +112,9 @@ export function Issues() {
   const filtered = issues
     .filter(i => brand === 'All' || i.brand === brand)
     .filter(i => !search || i.material.toLowerCase().includes(search.toLowerCase()) || i.desc.toLowerCase().includes(search.toLowerCase()))
-    .sort((a, b) => sort === 'value' ? Math.abs(b.variance * b.mrp) - Math.abs(a.variance * a.mrp) : Math.abs(b.variance) - Math.abs(a.variance));
+    .sort((a, b) => sort === 'material' ? a.material.localeCompare(b.material) : Math.abs(b.variance) - Math.abs(a.variance));
 
-  const totalImpact = filtered.reduce((s, i) => s + Math.abs(i.variance * i.mrp), 0);
+  const totalVariancePcs = filtered.reduce((s, i) => s + Math.abs(i.variance), 0);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
@@ -128,7 +128,7 @@ export function Issues() {
         actions={
           <>
             <StatusBadge status="Shortage" customLabel={`${filtered.length} Issues`} />
-            <StatusBadge status="Excess" customLabel={`₹${totalImpact.toLocaleString('en-IN')} at risk`} />
+            <StatusBadge status="Excess" customLabel={`${totalVariancePcs.toLocaleString('en-IN')} PCS Discrepancy`} />
           </>
         }
       />
@@ -190,8 +190,8 @@ export function Issues() {
             fontFamily: 'inherit',
           }}
         >
-          <option value="variance">By Variance</option>
-          <option value="value">By Value (₹)</option>
+          <option value="variance">By Variance (PCS)</option>
+          <option value="material">By Material Code</option>
         </select>
       </div>
 
@@ -210,7 +210,6 @@ export function Issues() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {filtered.map(issue => {
             const isShortage = issue.variance < 0;
-            const impact = Math.abs(issue.variance * issue.mrp);
 
             return (
               <div
@@ -252,12 +251,8 @@ export function Issues() {
                     </div>
                   </div>
 
-                  {/* Impact + action */}
+                  {/* Action */}
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8, flexShrink: 0 }}>
-                    <div style={{ textAlign: 'right' }}>
-                      <p style={{ fontSize: 10, fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', margin: '0 0 2px' }}>Impact</p>
-                      <p style={{ fontSize: 14, fontWeight: 700, color: '#0f172a', margin: 0 }}>₹{impact.toLocaleString('en-IN')}</p>
-                    </div>
                     <button
                       onClick={() => handleRecount(issue.id)}
                       style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 7, border: '1px solid #e2e8f0', background: '#fff', color: '#475569', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}
