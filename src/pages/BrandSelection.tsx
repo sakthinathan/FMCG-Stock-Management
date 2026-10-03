@@ -12,6 +12,8 @@ import { StatusBadge } from '@/components/common/StatusBadge';
 import { ConfirmModal } from '@/components/common/ConfirmModal';
 import { getBritanniaBrandImage, getBritanniaFallbackCDN } from '@/utils/brandImageUtils';
 
+import { broadcastStockCheckClosed, broadcastBrandUpdated } from '@/lib/stockSync';
+
 interface BrandSummary {
   name: string;
   totalProducts: number;
@@ -42,13 +44,25 @@ export function BrandSelection() {
     setShowCloseConfirm(false);
     if (activeUploadId) {
       try {
+        // 1. Mark in-progress sessions for this upload as Completed
         await supabase
           .from('stock_count_sessions')
           .update({ status: 'Completed' })
           .eq('upload_id', activeUploadId)
           .eq('status', 'In Progress');
+
+        // 2. Mark the stock upload row as closed in database
+        await supabase
+          .from('stock_uploads')
+          .update({ status: 'closed' })
+          .eq('id', activeUploadId);
+
+        // 3. Broadcast closure to all team members' devices across the godown
+        if (profile?.agency_id) {
+          await broadcastStockCheckClosed(profile.agency_id, activeUploadId);
+        }
       } catch (e) {
-        console.error("Error closing sessions:", e);
+        console.error("Error closing sessions and upload:", e);
       }
     }
     clearActiveUpload();
@@ -56,6 +70,8 @@ export function BrandSelection() {
   };
 
   useEffect(() => {
+    let debounceTimer: any = null;
+
     async function loadBrandSummaries() {
       if (!activeUploadId) {
         setLoading(false);
@@ -72,16 +88,22 @@ export function BrandSelection() {
           .select('id, brand, status')
           .eq('upload_id', activeUploadId);
 
-        const { data: counts } = await supabase
-          .from('physical_stock_counts')
-          .select('session_id');
+        const sessionIds = sessions?.map(s => s.id) || [];
+        let counts: { session_id: string }[] = [];
+        if (sessionIds.length > 0) {
+          const { data: cData } = await supabase
+            .from('physical_stock_counts')
+            .select('session_id')
+            .in('session_id', sessionIds);
+          if (cData) counts = cData;
+        }
 
         const brandMap = new Map<string, number>();
         snaps?.forEach(r => brandMap.set(r.brand, (brandMap.get(r.brand) || 0) + 1));
 
         const sessionMap = new Map(sessions?.map(s => [s.brand, s]) || []);
         const countMap = new Map<string, number>();
-        counts?.forEach(r => countMap.set(r.session_id, (countMap.get(r.session_id) || 0) + 1));
+        counts.forEach(r => countMap.set(r.session_id, (countMap.get(r.session_id) || 0) + 1));
 
         const list: BrandSummary[] = [];
         for (const [name, total] of brandMap.entries()) {
@@ -110,12 +132,70 @@ export function BrandSelection() {
     }
 
     loadBrandSummaries();
-  }, [activeUploadId]);
+
+    if (!activeUploadId) return;
+
+    const debouncedReload = () => {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        loadBrandSummaries();
+      }, 400);
+    };
+
+    // Realtime subscription for multi-device brand updates & stock check closure
+    const channelName = `brand_live_sync_${activeUploadId}`;
+    const channel = supabase
+      .channel(channelName)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'stock_count_sessions', filter: `upload_id=eq.${activeUploadId}` },
+        debouncedReload
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'physical_stock_counts' },
+        debouncedReload
+      )
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'stock_uploads', filter: `id=eq.${activeUploadId}` },
+        (payload: any) => {
+          if (payload.new?.status === 'closed') {
+            clearActiveUpload();
+            navigate('/upload');
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      clearTimeout(debounceTimer);
+      supabase.removeChannel(channel);
+    };
+  }, [activeUploadId, clearActiveUpload, navigate]);
 
   const handleStart = async (name: string, sessionId: string | null) => {
     if (sessionId) {
       navigate(`/count/${sessionId}`, { state: { brand: name } });
       return;
+    }
+    // Check if coworker on another device just created a session for this brand
+    if (activeUploadId) {
+      try {
+        const { data: existingSess } = await supabase
+          .from('stock_count_sessions')
+          .select('id, brand, status')
+          .eq('upload_id', activeUploadId)
+          .eq('brand', name)
+          .maybeSingle();
+
+        if (existingSess) {
+          navigate(`/count/${existingSess.id}`, { state: { brand: name } });
+          return;
+        }
+      } catch (e) {
+        console.warn('Error checking existing brand session:', e);
+      }
     }
     setPendingBrandName(name);
     setSessionNameInput(`Count - ${name}`);
@@ -139,6 +219,9 @@ export function BrandSelection() {
         .single();
 
       if (data) {
+        if (profile?.agency_id) {
+          await broadcastBrandUpdated(profile.agency_id, pendingBrandName, data.id);
+        }
         navigate(`/count/${data.id}`, { state: { brand: pendingBrandName } });
       }
     } catch (e) {
@@ -208,6 +291,14 @@ export function BrandSelection() {
         description={`${filename} · ${brands.length} brands · ${doneCount} completed`}
         actions={
           <>
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              background: '#f0fdf4', border: '1px solid #bbf7d0',
+              padding: '6px 10px', borderRadius: 8, fontSize: 11, fontWeight: 700, color: '#15803d'
+            }} title="Real-time multi-device synchronization active for this godown">
+              <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#22c55e', display: 'inline-block', boxShadow: '0 0 5px #22c55e' }} />
+              Godown Live Sync
+            </div>
             <button
               onClick={() => setShowCloseConfirm(true)}
               style={{
@@ -413,9 +504,9 @@ export function BrandSelection() {
       {/* Confirm Close Modal */}
       <ConfirmModal
         isOpen={showCloseConfirm}
-        title="Close Stock Check?"
-        description="Are you sure you want to CLOSE the current stock check? Once closed, this session will end, and you will need to upload a new Excel file to start a new check."
-        confirmText="Close Session"
+        title="Close Stock Check for Godown?"
+        description="Are you sure you want to CLOSE the current stock check? Once closed, this check will close across ALL mobile and desktop devices in this godown. All brand counts will be finalized and team members will be directed to reports."
+        confirmText="Yes, Close Stock Check"
         cancelText="Cancel"
         isDanger={true}
         onConfirm={confirmCloseStockCheck}

@@ -29,11 +29,15 @@ const btn = (primary = true, disabled = false): React.CSSProperties => ({
 });
 
 
+import { useAuth } from '@/contexts/AuthContext';
+import { broadcastBrandUpdated } from '@/lib/stockSync';
+
 export function StockCount() {
   const { sessionId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
   const { activeUploadId } = useStockStore();
+  const { profile } = useAuth();
 
   const [brandName, setBrandName] = useState('');
   const [allProducts, setAllProducts] = useState<any[]>([]);
@@ -144,6 +148,85 @@ export function StockCount() {
     loadSession();
   }, [sessionId, activeUploadId, location.state?.brand]);
 
+  // Real-time channel for live counting sync across multiple godown devices
+  useEffect(() => {
+    if (!sessionId || !activeUploadId) return;
+
+    const channelName = `session_live_${sessionId}`;
+    const channel = supabase
+      .channel(channelName)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'physical_stock_counts',
+          filter: `session_id=eq.${sessionId}`,
+        },
+        (payload: any) => {
+          const row = payload.new;
+          if (!row) return;
+          setAllProducts(prev =>
+            prev.map(p => {
+              if (p.id === row.snapshot_id) {
+                return {
+                  ...p,
+                  existingCbb: String(row.physical_cbb ?? ''),
+                  existingPcs: String(row.physical_pcs ?? ''),
+                  existingNotes: row.notes || '',
+                  existingReason: row.reason_code || '',
+                  existingStatus: row.status || 'Uncounted',
+                  existingVariance: row.variance,
+                };
+              }
+              return p;
+            })
+          );
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'stock_count_sessions',
+          filter: `id=eq.${sessionId}`,
+        },
+        (payload: any) => {
+          if (payload.new?.status === 'Completed') {
+            setShowCompletionModal(true);
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'stock_uploads',
+          filter: `id=eq.${activeUploadId}`,
+        },
+        (payload: any) => {
+          if (payload.new?.status === 'closed') {
+            setAlertConfig({
+              isOpen: true,
+              title: 'Stock Check Closed',
+              message: 'This stock check has been closed by a team member in this godown. You are being redirected to Reports.',
+              type: 'info',
+            });
+            setTimeout(() => {
+              navigate('/reports');
+            }, 2500);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [sessionId, activeUploadId, navigate]);
+
   // Evaluate simple math in inputs (e.g. 5+10)
   const evaluateMath = (str: string) => {
     if (!str) return '';
@@ -240,6 +323,9 @@ export function StockCount() {
 
         if (error) throw error;
         setSaveStatus('saved');
+        if (profile?.agency_id && brandName) {
+          broadcastBrandUpdated(profile.agency_id, brandName, sessionId);
+        }
 
         // Update local memory silently
         setAllProducts(prev => prev.map(p => p.id === currentProduct.id ? {
@@ -324,6 +410,9 @@ export function StockCount() {
           }, { onConflict: 'session_id,snapshot_id' });
 
         if (error) throw error;
+        if (profile?.agency_id && brandName) {
+          broadcastBrandUpdated(profile.agency_id, brandName, sessionId);
+        }
       } catch (e: any) {
         console.error('Background save error:', e);
       }

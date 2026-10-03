@@ -91,8 +91,11 @@ export function Dashboard() {
 
     fetchDashboardData();
     const channel = supabase
-      .channel('dash')
+      .channel(`dash_${activeUploadId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'physical_stock_counts' }, fetchDashboardData)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'stock_uploads', filter: `id=eq.${activeUploadId}` }, () => {
+        fetchDashboardData();
+      })
       .subscribe();
 
     return () => {

@@ -102,17 +102,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setProfile(profData);
       }
 
-      // 6. Synchronize stock store: set active stock upload belonging ONLY to this agency
+      // 6. Synchronize stock store: set active stock upload belonging ONLY to this agency and ONLY if not closed
       if (targetAgencyId) {
+        // First check if current activeUploadId from storage is still active in DB
+        const currentActiveId = useStockStore.getState().activeUploadId;
+        if (currentActiveId) {
+          const { data: currentUpload } = await supabase
+            .from('stock_uploads')
+            .select('id, status, file_name, uploaded_at')
+            .eq('id', currentActiveId)
+            .eq('agency_id', targetAgencyId)
+            .maybeSingle();
+
+          if (!currentUpload || currentUpload.status === 'closed') {
+            useStockStore.getState().clearActiveUpload();
+          }
+        }
+
+        // Find the latest active (non-closed) upload
         const { data: latestUpload } = await supabase
           .from('stock_uploads')
-          .select('id, file_name, uploaded_at')
+          .select('id, file_name, uploaded_at, status')
           .eq('agency_id', targetAgencyId)
+          .or('status.eq.active,status.is.null')
           .order('uploaded_at', { ascending: false })
           .limit(1)
           .maybeSingle();
 
-        if (latestUpload) {
+        if (latestUpload && latestUpload.status !== 'closed') {
           useStockStore.getState().setActiveUpload(latestUpload.id, latestUpload.file_name, latestUpload.uploaded_at);
         } else {
           useStockStore.getState().clearActiveUpload();

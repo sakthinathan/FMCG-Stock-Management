@@ -77,9 +77,19 @@ export function Sessions() {
     }
 
     loadSessions();
-    const ch = supabase.channel('sessions').on('postgres_changes', { event: '*', schema: 'public', table: 'physical_stock_counts' }, loadSessions).subscribe();
+    const ch = supabase
+      .channel(`sessions_${activeUploadId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'stock_count_sessions', filter: `upload_id=eq.${activeUploadId}` }, loadSessions)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'physical_stock_counts' }, loadSessions)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'stock_uploads', filter: `id=eq.${activeUploadId}` }, (payload: any) => {
+        if (payload.new?.status === 'closed') {
+          navigate('/reports');
+        }
+      })
+      .subscribe();
+
     return () => { supabase.removeChannel(ch); };
-  }, [activeUploadId]);
+  }, [activeUploadId, navigate]);
 
   if (loading) {
     return <LoadingSpinner label="Fetching audit sessions..." />;

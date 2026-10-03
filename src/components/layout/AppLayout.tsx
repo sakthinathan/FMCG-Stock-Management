@@ -8,6 +8,8 @@ import {
 import { useAuth } from '@/contexts/AuthContext';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useStockStore } from '@/store/useStockStore';
+import { AlertModal } from '@/components/common/AlertModal';
+import { useStockRealtimeSync } from '@/lib/stockSync';
 
 const navGroups = [
   {
@@ -72,6 +74,20 @@ export function AppLayout() {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
   const [time, setTime] = useState(new Date());
+  const [closedModalOpen, setClosedModalOpen] = useState(false);
+
+  const { isSyncConnected } = useStockRealtimeSync(agency?.id || profile?.agency_id, {
+    onStockCheckClosed: () => {
+      const sensitivePaths = ['/brands', '/count', '/sessions', '/issues'];
+      const isSensitive = sensitivePaths.some(p => location.pathname.startsWith(p));
+      if (isSensitive) {
+        setClosedModalOpen(true);
+      }
+    },
+    onStockCheckActivated: (_uploadId, fileName) => {
+      console.log('Stock check activated on another device:', fileName);
+    }
+  });
 
   useEffect(() => {
     const timer = setInterval(() => setTime(new Date()), 1000);
@@ -238,6 +254,28 @@ export function AppLayout() {
                 {filename}
               </span>
             )}
+
+            {/* Live Godown Sync Status */}
+            <div
+              title={isSyncConnected ? 'Real-time multi-device sync active for this godown' : 'Connecting to godown sync...'}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                background: isSyncConnected ? '#14532d40' : '#1e293b',
+                border: `1px solid ${isSyncConnected ? '#22c55e60' : '#334155'}`,
+                padding: '4px 8px', borderRadius: 6, flexShrink: 0
+              }}
+              className="sync-badge"
+            >
+              <span style={{
+                width: 7, height: 7, borderRadius: '50%',
+                background: isSyncConnected ? '#22c55e' : '#f59e0b',
+                display: 'inline-block',
+                boxShadow: isSyncConnected ? '0 0 6px #22c55e' : 'none'
+              }} />
+              <span style={{ fontSize: 10, fontWeight: 700, color: isSyncConnected ? '#4ade80' : '#94a3b8' }}>
+                {isSyncConnected ? 'Godown Sync' : 'Connecting'}
+              </span>
+            </div>
             
             <div style={{
               display: 'flex', flexDirection: 'column', alignItems: 'flex-end',
@@ -396,6 +434,18 @@ export function AppLayout() {
           .main-content { padding: 20px 16px 80px !important; }
         }
       `}</style>
+
+      {/* Alert Modal when Stock Check is Closed by a team member */}
+      <AlertModal
+        isOpen={closedModalOpen}
+        title="Stock Check Closed"
+        message="A team member in this godown has closed the current stock check session. Active counts have been finalized across all devices. You are now being redirected to Reports."
+        type="info"
+        onClose={() => {
+          setClosedModalOpen(false);
+          navigate('/reports');
+        }}
+      />
     </div>
   );
 }

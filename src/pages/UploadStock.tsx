@@ -7,6 +7,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { PageHeader } from '@/components/common/PageHeader';
 import { StatusBadge } from '@/components/common/StatusBadge';
 
+import { broadcastStockCheckActivated } from '@/lib/stockSync';
+
 const card: React.CSSProperties = { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, boxShadow: '0 1px 3px rgba(0,0,0,0.06)' };
 const btn = (primary = true): React.CSSProperties => ({
   display: 'inline-flex', alignItems: 'center', gap: 6, padding: '10px 20px',
@@ -40,6 +42,30 @@ export function UploadStock() {
 
   useEffect(() => { fetchHistory(); }, [currentAgencyId]);
 
+  const handleSwitchUpload = async (upload: any) => {
+    if (!currentAgencyId) return;
+    try {
+      // 1. Mark other uploads as closed
+      await supabase
+        .from('stock_uploads')
+        .update({ status: 'closed' })
+        .eq('agency_id', currentAgencyId)
+        .neq('id', upload.id);
+
+      // 2. Mark this upload as active
+      await supabase
+        .from('stock_uploads')
+        .update({ status: 'active' })
+        .eq('id', upload.id);
+
+      setActiveUpload(upload.id, upload.file_name, upload.uploaded_at);
+      await broadcastStockCheckActivated(currentAgencyId, upload.id, upload.file_name, upload.uploaded_at);
+      fetchHistory();
+    } catch (e) {
+      console.error('Error switching active stock file:', e);
+    }
+  };
+
   const formatStockFileName = (originalName: string): string => {
     const now = new Date();
     const day = String(now.getDate()).padStart(2, '0');
@@ -67,8 +93,23 @@ export function UploadStock() {
 
       const formattedFileName = formatStockFileName(file.name);
 
+      // 1. Mark any previous active uploads for this godown as closed
+      if (currentAgencyId) {
+        await supabase
+          .from('stock_uploads')
+          .update({ status: 'closed' })
+          .eq('agency_id', currentAgencyId)
+          .or('status.eq.active,status.is.null');
+      }
+
+      // 2. Insert new active upload header
       const { data: uploadData, error: uploadError } = await supabase.from('stock_uploads')
-        .insert({ file_name: formattedFileName, total_records: result.products.length, agency_id: currentAgencyId }).select().single();
+        .insert({
+          file_name: formattedFileName,
+          total_records: result.products.length,
+          agency_id: currentAgencyId,
+          status: 'active'
+        }).select().single();
       if (uploadError) throw uploadError;
 
       const prevVariances = new Map();
@@ -113,6 +154,12 @@ export function UploadStock() {
 
       setParseResult(result);
       setActiveUpload(uploadData.id, formattedFileName, uploadData.uploaded_at);
+
+      // 3. Broadcast newly activated upload to all team members' devices
+      if (currentAgencyId) {
+        await broadcastStockCheckActivated(currentAgencyId, uploadData.id, formattedFileName, uploadData.uploaded_at);
+      }
+
       fetchHistory();
     } catch (err: any) {
       setError(err.message || 'Failed to process file.');
@@ -220,12 +267,21 @@ export function UploadStock() {
                       <p style={{ fontSize: 11, color: '#64748b', margin: '2px 0 0' }}>{upload.total_records} SKUs · {new Date(upload.uploaded_at).toLocaleString()}</p>
                     </div>
                   </div>
-                  <div style={{ flexShrink: 0 }}>
+                  <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
                     {isActive ? (
-                      <StatusBadge status="Completed" customLabel="Active" />
+                      <StatusBadge status="Completed" customLabel="Active Stock Check" />
+                    ) : upload.status === 'closed' ? (
+                      <>
+                        <span style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, background: '#f1f5f9', color: '#64748b', fontWeight: 600 }}>
+                          Closed
+                        </span>
+                        <button style={{ ...btn(false), padding: '6px 14px', fontSize: 12 }} onClick={() => handleSwitchUpload(upload)}>
+                          Re-open
+                        </button>
+                      </>
                     ) : (
-                      <button style={{ ...btn(false), padding: '6px 14px', fontSize: 12 }} onClick={() => setActiveUpload(upload.id, upload.file_name, upload.uploaded_at)}>
-                        Switch
+                      <button style={{ ...btn(false), padding: '6px 14px', fontSize: 12 }} onClick={() => handleSwitchUpload(upload)}>
+                        Activate
                       </button>
                     )}
                   </div>
