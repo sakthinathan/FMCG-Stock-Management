@@ -160,11 +160,11 @@ export function createReportPdfDocument(
       }
     });
   } else {
-    // ── 1. Sort: Brand A-Z → Material A-Z within each brand ───────────────────
+    // ── 1. Sort: Brand A-Z → Description A-Z within each brand ───────────────
     const sorted = [...rows].sort((a, b) => {
       const brandCmp = (a['Brand'] || '').localeCompare(b['Brand'] || '');
       if (brandCmp !== 0) return brandCmp;
-      return (a['Material'] || '').localeCompare(b['Material'] || '');
+      return (a['Description'] || '').localeCompare(b['Description'] || '');
     });
 
     // ── 2. Pre-compute per-brand SKU count for group header labels ─────────────
@@ -188,7 +188,7 @@ export function createReportPdfDocument(
         body.push([
           {
             content: `  ${brand.toUpperCase()}   —   ${skuCount} SKU${skuCount !== 1 ? 's' : ''}`,
-            colSpan: 8,
+            colSpan: 6,
             styles: {
               fillColor: [15, 23, 42],
               textColor: [248, 250, 252],
@@ -200,9 +200,9 @@ export function createReportPdfDocument(
         ]);
       }
 
-      // Data row with MRP and CBB & PCS representation
-      const mrpNum = Number(r['MRP (₹)'] !== undefined ? r['MRP (₹)'] : (r['MRP'] !== undefined ? r['MRP'] : 0));
-      const mrpVal = mrpNum > 0 ? `₹${mrpNum.toFixed(2)}` : '—';
+      // Data row with MRP first, NO currency symbol, kept bold
+      const mrpNum = Number(r['MRP'] !== undefined ? r['MRP'] : (r['MRP (₹)'] !== undefined ? r['MRP (₹)'] : 0));
+      const mrpVal = mrpNum > 0 ? (mrpNum % 1 === 0 ? String(mrpNum) : mrpNum.toFixed(2)) : '—';
 
       const sysVal = r['System Stock (CBB & PCS)'] || `${r['System Qty (PCS)'] || 0} PCS`;
       const phyVal = r['Physical Stock (CBB & PCS)'] !== undefined
@@ -217,10 +217,8 @@ export function createReportPdfDocument(
       const statusVal = r['Status'] || r['Trend'] || 'Not Counted';
 
       body.push([
-        r['Material'] || '',
-        (r['Description'] || '').substring(0, 36),
         mrpVal,
-        r['Case Size (1 CBB)'] || '1 PCS',
+        (r['Description'] || '').substring(0, 48),
         sysVal,
         phyVal,
         diffVal,
@@ -228,11 +226,9 @@ export function createReportPdfDocument(
       ]);
     }
 
-    // ── 4. Column headers (8 cols with MRP and CBB & PCS columns) ─────
+    // ── 4. Column headers (6 cols: MRP first, no Material Code, no 1 CBB Size) ─────
     const head = [[
-      'Material', 'Description', 'MRP', '1 CBB Size',
-      'System Stock', 'Physical Stock', 'Difference (CBB & PCS)',
-      'Audit Status',
+      'MRP', 'Description', 'System Stock', 'Physical Stock', 'Difference (CBB & PCS)', 'Audit Status',
     ]];
 
     autoTable(doc, {
@@ -245,14 +241,12 @@ export function createReportPdfDocument(
       alternateRowStyles: { fillColor: [248, 250, 252] },
       showHead: 'everyPage',
       columnStyles: {
-        0: { cellWidth: 26, fontStyle: 'bold' },                  // Material
-        1: { cellWidth: 58 },                                    // Description
-        2: { halign: 'right', cellWidth: 18, fontStyle: 'bold' },// MRP
-        3: { halign: 'center', cellWidth: 20 },                  // 1 CBB Size
-        4: { halign: 'right', cellWidth: 41 },                   // System Stock
-        5: { halign: 'right', cellWidth: 41 },                   // Physical Stock
-        6: { halign: 'right', cellWidth: 42, fontStyle: 'bold' },// Difference (CBB & PCS)
-        7: { halign: 'center', cellWidth: 24, fontStyle: 'bold' },// Audit Status
+        0: { halign: 'right', cellWidth: 22, fontStyle: 'bold' }, // MRP (Col 0, bold, no symbol, right aligned)
+        1: { cellWidth: 85 },                                    // Description (Col 1)
+        2: { halign: 'right', cellWidth: 42 },                   // System Stock (Col 2)
+        3: { halign: 'right', cellWidth: 42 },                   // Physical Stock (Col 3)
+        4: { halign: 'right', cellWidth: 48, fontStyle: 'bold' },// Difference (CBB & PCS) (Col 4)
+        5: { halign: 'center', cellWidth: 30, fontStyle: 'bold' },// Audit Status (Col 5, Last column)
       },
       didParseCell: (data) => {
         if (data.section !== 'body') return;
@@ -262,11 +256,17 @@ export function createReportPdfDocument(
         }
 
         const colIdx = data.column.index;
-        const status = String(data.row.cells[7]?.text?.[0] || '').trim();
-        const diffText = String(data.row.cells[6]?.text?.[0] || '').trim();
+        const status = String(data.row.cells[5]?.text?.[0] || '').trim();
+        const diffText = String(data.row.cells[4]?.text?.[0] || '').trim();
 
-        // 1. Audit Status Column (Last column): Green for equal and excess, Red for shortage
-        if (colIdx === 7) {
+        // 1. MRP Column (Col 0): First column, bold, pure numeric
+        if (colIdx === 0) {
+          data.cell.styles.fontStyle = 'bold';
+          data.cell.styles.textColor = [15, 23, 42];
+        }
+
+        // 2. Audit Status Column (Col 5, Last column): Green for equal and excess, Red for shortage
+        if (colIdx === 5) {
           data.cell.styles.fontStyle = 'bold';
           data.cell.styles.fontSize = 7.5;
           if (status === 'Shortage' || status.toLowerCase().includes('short')) {
@@ -295,8 +295,8 @@ export function createReportPdfDocument(
           }
         }
 
-        // 2. Difference Column (Col 6): Red for negative/shortage, Green for positive/excess and zero
-        if (colIdx === 6) {
+        // 3. Difference Column (Col 4): Red for negative/shortage, Green for positive/excess and zero
+        if (colIdx === 4) {
           data.cell.styles.fontStyle = 'bold';
           if (diffText.startsWith('-') || status === 'Shortage') {
             data.cell.styles.textColor = [185, 28, 28]; // deep red
@@ -305,18 +305,6 @@ export function createReportPdfDocument(
           } else if (diffText.includes('0 CBB 0 PCS') || diffText === '0 PCS') {
             data.cell.styles.textColor = [22, 101, 52]; // green
           }
-        }
-
-        // 3. Material Code Column (Col 0)
-        if (colIdx === 0) {
-          data.cell.styles.fontStyle = 'bold';
-          data.cell.styles.textColor = [15, 23, 42];
-        }
-
-        // 4. MRP Column (Col 2)
-        if (colIdx === 2) {
-          data.cell.styles.fontStyle = 'bold';
-          data.cell.styles.textColor = [51, 65, 85];
         }
       },
     });

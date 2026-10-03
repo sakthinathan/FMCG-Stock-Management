@@ -477,11 +477,9 @@ export function Reports() {
           const conv = r.conversion || 1;
           const diffBreakdown = calculateCbbPcs(r.deltaCount, conv, true);
           return {
-            'Material': r.material,
+            'MRP': r.mrp,
             'Description': r.description,
             'Brand': r.brand,
-            'MRP (₹)': r.mrp,
-            'Case Size (1 CBB)': `${conv} PCS`,
             'Upload A Sys (PCS)': r.sysA,
             'Upload A Phy (PCS)': r.phyA,
             'Upload A Var (PCS)': r.varA,
@@ -524,11 +522,9 @@ export function Reports() {
       }
 
       const row = {
-        'Material': snap.material,
+        'MRP': mrp,
         'Description': snap.material_desc,
         'Brand': snap.brand,
-        'MRP (₹)': mrp,
-        'Case Size (1 CBB)': `${conv} PCS`,
         'System Stock (CBB & PCS)': sysBreakdown.formatted,
         'System Qty (PCS)': sysPcs,
         'Physical Stock (CBB & PCS)': phyBreakdown ? phyBreakdown.formatted : 'Not Counted',
@@ -563,9 +559,9 @@ export function Reports() {
         return (r['Brand'] || '').toLowerCase().includes(query);
       }
       return (
-        (r['Material'] || '').toLowerCase().includes(query) ||
         (r['Description'] || '').toLowerCase().includes(query) ||
         (r['Brand'] || '').toLowerCase().includes(query) ||
+        (String(r['MRP'] || '')).toLowerCase().includes(query) ||
         (String(r['Status'] || '')).toLowerCase().includes(query) ||
         (String(r['Trend'] || '')).toLowerCase().includes(query) ||
         (String(r['Reason Code'] || '')).toLowerCase().includes(query)
@@ -715,11 +711,9 @@ export function Reports() {
       }
 
       const row = {
-        'Material': snap.material,
+        'MRP': mrp,
         'Description': snap.material_desc,
         'Brand': snap.brand,
-        'MRP (₹)': mrp,
-        'Case Size (1 CBB)': `${conv} PCS`,
         'System Stock (CBB & PCS)': sysBreakdown.formatted,
         'System Qty (PCS)': sysPcs,
         'Physical Stock (CBB & PCS)': phyBreakdown ? phyBreakdown.formatted : 'Not Counted',
@@ -1653,10 +1647,9 @@ export function Reports() {
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                 <thead style={{ position: 'sticky', top: 0, zIndex: 5 }}>
                   <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
-                    <th style={{ padding: '11px 16px', fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'left' }}>Material & Desc</th>
+                    <th style={{ padding: '11px 16px', fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'right', width: 90 }}>MRP</th>
+                    <th style={{ padding: '11px 16px', fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'left' }}>Description</th>
                     <th style={{ padding: '11px 16px', fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'left' }}>Brand</th>
-                    <th style={{ padding: '11px 16px', fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'right' }}>MRP</th>
-                    <th style={{ padding: '11px 16px', fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'center' }}>1 CBB</th>
                     <th style={{ padding: '11px 16px', fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'right' }}>Primary Audit</th>
                     <th style={{ padding: '11px 16px', fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'right' }}>Secondary Audit</th>
                     <th style={{ padding: '11px 16px', fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'right' }}>Count Delta (CBB & PCS)</th>
@@ -1665,7 +1658,7 @@ export function Reports() {
                 <tbody>
                   {filteredPreviewRows.length === 0 ? (
                     <tr>
-                      <td colSpan={7} style={{ padding: 48, textAlign: 'center', color: '#64748b' }}>
+                      <td colSpan={6} style={{ padding: 48, textAlign: 'center', color: '#64748b' }}>
                         <History size={36} color="#cbd5e1" style={{ margin: '0 auto 8px', display: 'block' }} />
                         <p style={{ fontWeight: 600, margin: '0 0 4px', color: '#334155' }}>
                           {!compareUploadId ? 'Select a secondary snapshot above to compare' : 'No matching materials found in this scope'}
@@ -1674,17 +1667,17 @@ export function Reports() {
                       </td>
                     </tr>
                   ) : (
-                    filteredPreviewRows.map((r: any) => {
+                    filteredPreviewRows.map((r: any, idx: number) => {
                       const delta = Number(r['Delta Count (PCS)']) || 0;
+                      const mrpNum = Number(r['MRP'] !== undefined ? r['MRP'] : (r['MRP (₹)'] !== undefined ? r['MRP (₹)'] : 0));
+                      const mrpVal = mrpNum > 0 ? (mrpNum % 1 === 0 ? String(mrpNum) : mrpNum.toFixed(2)) : '—';
                       return (
-                        <tr key={r['Material']} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                        <tr key={`${r['Description']}_${idx}`} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                          <td style={{ padding: '10px 16px', textAlign: 'right', fontWeight: 800, color: '#0f172a' }}>{mrpVal}</td>
                           <td style={{ padding: '10px 16px' }}>
-                            <span style={{ fontFamily: 'monospace', fontWeight: 700, color: '#0f172a', display: 'block' }}>{r['Material']}</span>
-                            <span style={{ fontSize: 12, color: '#64748b' }}>{r['Description']}</span>
+                            <span style={{ fontSize: 13, fontWeight: 600, color: '#0f172a' }}>{r['Description']}</span>
                           </td>
                           <td style={{ padding: '10px 16px', color: '#475569', fontWeight: 600 }}>{r['Brand']}</td>
-                          <td style={{ padding: '10px 16px', textAlign: 'right', fontWeight: 600, color: '#475569' }}>₹{r['MRP (₹)']}</td>
-                          <td style={{ padding: '10px 16px', textAlign: 'center', fontSize: 11, color: '#64748b', fontWeight: 600 }}>{r['Case Size (1 CBB)']}</td>
                           <td style={{ padding: '10px 16px', textAlign: 'right' }}>
                             <div style={{ fontSize: 12, fontWeight: 600, color: '#0f172a' }}>{r['Upload A Phy (PCS)']} PCS</div>
                             <div style={{ fontSize: 11, color: r['Upload A Var (PCS)'] < 0 ? '#dc2626' : '#64748b' }}>Var: {r['Upload A Var (PCS)']}</div>
@@ -1721,12 +1714,10 @@ export function Reports() {
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                 <thead style={{ position: 'sticky', top: 0, zIndex: 5 }}>
                   <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
-                    <th style={{ padding: '11px 14px', fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', width: 40 }}>#</th>
-                    <th style={{ padding: '11px 14px', fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'left' }}>Material Code</th>
+                    <th style={{ padding: '11px 14px', fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', width: 40, textAlign: 'center' }}>#</th>
+                    <th style={{ padding: '11px 14px', fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'right', width: 85 }}>MRP</th>
                     <th style={{ padding: '11px 14px', fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'left' }}>Description</th>
                     <th style={{ padding: '11px 14px', fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'left' }}>Brand</th>
-                    <th style={{ padding: '11px 14px', fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'right' }}>MRP</th>
-                    <th style={{ padding: '11px 14px', fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'center' }}>1 CBB Size</th>
                     <th style={{ padding: '11px 14px', fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'right' }}>System Stock</th>
                     <th style={{ padding: '11px 14px', fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'right' }}>Physical Stock</th>
                     <th style={{ padding: '11px 14px', fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'right' }}>Difference (CBB & PCS)</th>
@@ -1737,7 +1728,7 @@ export function Reports() {
                 <tbody>
                   {filteredPreviewRows.length === 0 ? (
                     <tr>
-                      <td colSpan={11} style={{ padding: 48, textAlign: 'center', color: '#64748b' }}>
+                      <td colSpan={9} style={{ padding: 48, textAlign: 'center', color: '#64748b' }}>
                         <CheckCircle2 size={38} color="#10b981" style={{ margin: '0 auto 8px', display: 'block' }} />
                         <p style={{ fontWeight: 700, fontSize: 15, margin: '0 0 4px', color: '#0f172a' }}>
                           {searchQuery
@@ -1768,21 +1759,23 @@ export function Reports() {
                       const variance = r['Variance (PCS)'];
                       const hasCount = variance !== '' && variance !== null && variance !== undefined;
                       const numVar = Number(variance);
+                      const mrpNum = Number(r['MRP'] !== undefined ? r['MRP'] : (r['MRP (₹)'] !== undefined ? r['MRP (₹)'] : 0));
+                      const mrpVal = mrpNum > 0 ? (mrpNum % 1 === 0 ? String(mrpNum) : mrpNum.toFixed(2)) : '—';
 
                       return (
                         <tr
-                          key={`${r['Material']}_${idx}`}
+                          key={`${r['Description']}_${idx}`}
                           style={{
                             borderBottom: '1px solid #f1f5f9',
                             background: idx % 2 === 1 ? '#fafafa' : '#ffffff',
                           }}
                         >
                           <td style={{ padding: '10px 14px', fontSize: 11, color: '#94a3b8', textAlign: 'center' }}>{idx + 1}</td>
-                          <td style={{ padding: '10px 14px', fontFamily: 'monospace', fontWeight: 700, color: '#0f172a' }}>
-                            {r['Material']}
+                          <td style={{ padding: '10px 14px', textAlign: 'right', fontWeight: 800, color: '#0f172a', fontSize: 13 }}>
+                            {mrpVal}
                           </td>
-                          <td style={{ padding: '10px 14px', color: '#334155', maxWidth: 240 }}>
-                            <span style={{ display: '-webkit-box', WebkitLineClamp: 1, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                          <td style={{ padding: '10px 14px', color: '#334155', maxWidth: 280 }}>
+                            <span style={{ fontWeight: 600, color: '#0f172a', display: '-webkit-box', WebkitLineClamp: 1, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
                               {r['Description']}
                             </span>
                           </td>
@@ -1790,12 +1783,6 @@ export function Reports() {
                             <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 4, background: '#f1f5f9', color: '#475569' }}>
                               {r['Brand']}
                             </span>
-                          </td>
-                          <td style={{ padding: '10px 14px', textAlign: 'right', fontWeight: 600, color: '#64748b' }}>
-                            ₹{r['MRP (₹)']}
-                          </td>
-                          <td style={{ padding: '10px 14px', textAlign: 'center', fontSize: 11, color: '#64748b', fontWeight: 600 }}>
-                            {r['Case Size (1 CBB)']}
                           </td>
                           <td style={{ padding: '10px 14px', textAlign: 'right' }}>
                             <div style={{ fontWeight: 700, color: '#334155' }}>{r['System Stock (CBB & PCS)']}</div>
