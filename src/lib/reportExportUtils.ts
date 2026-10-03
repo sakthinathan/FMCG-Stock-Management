@@ -21,27 +21,29 @@ export function exportDataToExcel(data: any[], reportType: string, filenamePrefi
   return true;
 }
 
-export function exportReportToPdf(
+export interface ReportPdfStats {
+  totalSkus: number;
+  countedSkus: number;
+  systemCbb?: number;
+  systemLoosePcs?: number;
+  physicalCbb?: number;
+  physicalLoosePcs?: number;
+  netVarCbb?: number;
+  netVarLoosePcs?: number;
+  systemQtyPcs?: number;
+  physicalQtyPcs?: number;
+  netVariancePcs?: number;
+  shortageItems?: number;
+  excessItems?: number;
+}
+
+export function createReportPdfDocument(
   rows: any[],
   reportTitle: string,
-  stats: {
-    totalSkus: number;
-    countedSkus: number;
-    systemCbb?: number;
-    systemLoosePcs?: number;
-    physicalCbb?: number;
-    physicalLoosePcs?: number;
-    netVarCbb?: number;
-    netVarLoosePcs?: number;
-    systemQtyPcs?: number;
-    physicalQtyPcs?: number;
-    netVariancePcs?: number;
-    shortageItems?: number;
-    excessItems?: number;
-  },
+  stats: ReportPdfStats,
   agencyName = 'FMCG DISTRIBUTOR'
-) {
-  if (!rows || rows.length === 0) return false;
+): { doc: jsPDF; filename: string } | null {
+  if (!rows || rows.length === 0) return null;
 
   const doc = new jsPDF({ orientation: 'landscape' });
   const dateStr = new Date().toLocaleDateString('en-IN', {
@@ -225,6 +227,32 @@ export function exportReportToPdf(
 
   const fileDate = new Date().toISOString().split('T')[0];
   const cleanTitle = reportTitle.replace(/[^a-zA-Z0-9]/g, '_');
-  doc.save(`${agencyName.replace(/\s+/g, '_')}_${cleanTitle}_${fileDate}.pdf`);
+  const filename = `${agencyName.replace(/\s+/g, '_')}_${cleanTitle}_${fileDate}.pdf`;
+
+  return { doc, filename };
+}
+
+export function exportReportToPdf(
+  rows: any[],
+  reportTitle: string,
+  stats: ReportPdfStats,
+  agencyName = 'FMCG DISTRIBUTOR'
+): boolean {
+  const result = createReportPdfDocument(rows, reportTitle, stats, agencyName);
+  if (!result) return false;
+  result.doc.save(result.filename);
   return true;
+}
+
+export function generateReportPdfFile(
+  rows: any[],
+  reportTitle: string,
+  stats: ReportPdfStats,
+  agencyName = 'FMCG DISTRIBUTOR'
+): { file: File; blob: Blob; filename: string; doc: jsPDF } | null {
+  const result = createReportPdfDocument(rows, reportTitle, stats, agencyName);
+  if (!result) return null;
+  const blob = result.doc.output('blob');
+  const file = new File([blob], result.filename, { type: 'application/pdf' });
+  return { file, blob, filename: result.filename, doc: result.doc };
 }

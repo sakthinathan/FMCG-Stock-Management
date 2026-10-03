@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   FileSpreadsheet, Download, FileText, History,
   Building2, Layers, Calendar, Search, X,
   AlertTriangle, AlertCircle, TrendingUp, TrendingDown,
-  CheckCircle2, Globe, ListChecks
+  CheckCircle2, Globe, ListChecks, MessageCircle, SlidersHorizontal, Share2
 } from 'lucide-react';
 import { useStockStore } from '@/store/useStockStore';
 import { supabase } from '@/lib/supabase';
@@ -14,6 +14,7 @@ import { AlertModal } from '@/components/common/AlertModal';
 import { exportDataToExcel, exportReportToPdf, type ReportType } from '@/lib/reportExportUtils';
 import { useAuth } from '@/contexts/AuthContext';
 import { calculateCbbPcs, formatCbbPcs } from '@/lib/cbbUtils';
+import { BrandSelectorReportModal } from '@/components/common/BrandSelectorReportModal';
 
 interface BrandSummaryItem {
   brand: string;
@@ -65,6 +66,7 @@ export function Reports() {
   const [activeReportType, setActiveReportType] = useState<ReportType>('full');
   const [searchQuery, setSearchQuery] = useState('');
   const [downloadingType, setDownloadingType] = useState<'excel' | 'pdf' | null>(null);
+  const [showBrandSelectorModal, setShowBrandSelectorModal] = useState(false);
 
   // Modal notification state
   const [alertConfig, setAlertConfig] = useState<{
@@ -632,6 +634,139 @@ export function Reports() {
     handleExportPdf('completed');
   };
 
+  // Computes precise rows and CBB & PCS statistics for an arbitrary selection of brands
+  const getReportDataForBrands = useCallback((brandNames: string[]) => {
+    const brandSet = new Set(brandNames);
+
+    let totalSysQty = 0;
+    let totalPhyQty = 0;
+    let totalSysCbb = 0;
+    let totalSysLoosePcs = 0;
+    let totalPhyCbb = 0;
+    let totalPhyLoosePcs = 0;
+
+    let totalShortageQty = 0;
+    let totalShortageCbb = 0;
+    let totalShortageLoosePcs = 0;
+
+    let totalExcessQty = 0;
+    let totalExcessCbb = 0;
+    let totalExcessLoosePcs = 0;
+
+    let totalShortageCount = 0;
+    let totalExcessCount = 0;
+    let totalCounted = 0;
+    let totalSkus = 0;
+
+    const rows: any[] = [];
+
+    rawSnapshots.forEach(snap => {
+      const b = snap.brand || 'Unbranded';
+      if (!brandSet.has(b)) return;
+
+      totalSkus++;
+      const conv = Number(snap.conversion) > 0 ? Number(snap.conversion) : 1;
+      const mrp = Number(snap.mrp) || 0;
+      const sysPcs = Number(snap.system_qty_pcs) || 0;
+      const skuSysCbb = Math.floor(sysPcs / conv);
+      const skuSysLoose = sysPcs % conv;
+
+      totalSysQty += sysPcs;
+      totalSysCbb += skuSysCbb;
+      totalSysLoosePcs += skuSysLoose;
+
+      const count = countMap.get(snap.id);
+      const phyPcs = count ? Number(count.physical_total_pcs) || 0 : null;
+      const variance = count ? Number(count.variance) || 0 : null;
+      const prevVariance = Number(snap.prev_variance) || 0;
+      const status = count ? count.status : 'Not Counted';
+
+      const sysBreakdown = calculateCbbPcs(sysPcs, conv, false);
+      const phyBreakdown = count ? calculateCbbPcs(phyPcs, conv, false) : null;
+      const varBreakdown = count ? calculateCbbPcs(variance, conv, true) : null;
+      const prevVarBreakdown = calculateCbbPcs(prevVariance, conv, true);
+
+      let trend = 'No Change';
+      if (count && variance !== null) {
+        totalCounted++;
+        const skuPhyCbb = Math.floor((phyPcs || 0) / conv);
+        const skuPhyLoose = (phyPcs || 0) % conv;
+        totalPhyQty += (phyPcs || 0);
+        totalPhyCbb += skuPhyCbb;
+        totalPhyLoosePcs += skuPhyLoose;
+
+        if (variance < 0) {
+          const absVar = Math.abs(variance);
+          totalShortageCount++;
+          totalShortageQty += absVar;
+          totalShortageCbb += Math.floor(absVar / conv);
+          totalShortageLoosePcs += absVar % conv;
+        } else if (variance > 0) {
+          totalExcessCount++;
+          totalExcessQty += variance;
+          totalExcessCbb += Math.floor(variance / conv);
+          totalExcessLoosePcs += variance % conv;
+        }
+
+        if (prevVariance === 0 && variance !== 0) trend = 'New Issue';
+        else if (variance === 0 && prevVariance !== 0) trend = 'Resolved';
+        else if (Math.abs(variance) > Math.abs(prevVariance)) trend = 'Increased Variance';
+        else if (Math.abs(variance) < Math.abs(prevVariance)) trend = 'Decreased Variance';
+      }
+
+      const row = {
+        'Material': snap.material,
+        'Description': snap.material_desc,
+        'Brand': snap.brand,
+        'MRP (₹)': mrp,
+        'Case Size (1 CBB)': `${conv} PCS`,
+        'System Stock (CBB & PCS)': sysBreakdown.formatted,
+        'System Qty (PCS)': sysPcs,
+        'Physical Stock (CBB & PCS)': phyBreakdown ? phyBreakdown.formatted : 'Not Counted',
+        'Physical Qty (PCS)': count ? phyPcs : 'Not Counted',
+        'Difference (CBB & PCS)': varBreakdown ? varBreakdown.formatted : '',
+        'Variance (PCS)': count ? variance : '',
+        'Status': status,
+        'Reason Code': count?.reason_code || '',
+        'Notes': count?.notes || '',
+        'Previous Variance (CBB & PCS)': prevVarBreakdown.formatted,
+        'Previous Variance (PCS)': prevVariance,
+        'Trend': trend,
+      };
+
+      if (activeReportType === 'full') rows.push(row);
+      else if (activeReportType === 'shortage' && count && status === 'Shortage') rows.push(row);
+      else if (activeReportType === 'excess' && count && status === 'Excess') rows.push(row);
+      else if (activeReportType === 'increased_variance' && count && Math.abs(variance || 0) > Math.abs(prevVariance) && (variance || 0) !== 0) rows.push(row);
+      else if (activeReportType === 'new_issues' && count && prevVariance === 0 && (variance || 0) !== 0) rows.push(row);
+      else rows.push(row);
+    });
+
+    const stats = {
+      totalSkus,
+      countedSkus: totalCounted,
+      systemCbb: totalSysCbb,
+      systemLoosePcs: totalSysLoosePcs,
+      systemQtyPcs: totalSysQty,
+      physicalCbb: totalPhyCbb,
+      physicalLoosePcs: totalPhyLoosePcs,
+      physicalQtyPcs: totalPhyQty,
+      shortageCbb: totalShortageCbb,
+      shortageLoosePcs: totalShortageLoosePcs,
+      shortageQtyPcs: totalShortageQty,
+      excessCbb: totalExcessCbb,
+      excessLoosePcs: totalExcessLoosePcs,
+      excessQtyPcs: totalExcessQty,
+      netVarCbb: Math.abs(totalPhyCbb - totalSysCbb),
+      netVarLoosePcs: Math.abs(totalPhyLoosePcs - totalSysLoosePcs),
+      netVariancePcs: totalPhyQty - totalSysQty,
+      shortageItems: totalShortageCount,
+      excessItems: totalExcessCount,
+    };
+
+    return { rows, stats };
+  }, [rawSnapshots, countMap, activeReportType]);
+
   // Report configuration metadata
   const REPORT_CONFIG: Record<
     ReportType,
@@ -741,6 +876,56 @@ export function Reports() {
         icon={FileSpreadsheet}
         actions={
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            {/* Direct WhatsApp Report with Brand Selector & PDF attachment */}
+            <button
+              onClick={() => setShowBrandSelectorModal(true)}
+              style={{
+                padding: '10px 16px',
+                borderRadius: 10,
+                border: 'none',
+                background: '#22c55e',
+                color: '#ffffff',
+                fontSize: 13,
+                fontWeight: 700,
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 7,
+                boxShadow: '0 3px 10px rgba(34, 197, 94, 0.35)',
+                transition: 'all 0.15s ease',
+              }}
+              title="Select brands, generate PDF, and share directly to WhatsApp with PDF attached"
+            >
+              <MessageCircle size={16} />
+              WhatsApp Report (PDF)
+            </button>
+
+            {/* Customize Brands Selector & Multi-Export */}
+            <button
+              onClick={() => setShowBrandSelectorModal(true)}
+              style={{
+                padding: '10px 15px',
+                borderRadius: 10,
+                border: '1.5px solid #cbd5e1',
+                background: '#ffffff',
+                color: '#334155',
+                fontSize: 13,
+                fontWeight: 700,
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+                transition: 'all 0.15s ease',
+              }}
+              title="Select specific brands to download as PDF, Excel, or share via WhatsApp"
+            >
+              <SlidersHorizontal size={15} color="#64748b" />
+              Customize Brands ({completedBrandNames.size}/{uniqueBrands.length})
+            </button>
+
             {/* Quick 1-Click PDF export for completed brands */}
             <button
               onClick={handleExportCompletedPdf}
@@ -764,7 +949,7 @@ export function Reports() {
               title="Download PDF containing only brands where stock check is complete"
             >
               <CheckCircle2 size={15} color="#16a34a" />
-              Download Completed Brands PDF ({completedBrandNames.size})
+              Completed Brands PDF ({completedBrandNames.size})
             </button>
 
             {/* Print Active View PDF */}
@@ -1273,6 +1458,30 @@ export function Reports() {
                 )}
               </div>
 
+              {/* WhatsApp Share Button */}
+              <button
+                onClick={() => setShowBrandSelectorModal(true)}
+                style={{
+                  padding: '8px 14px',
+                  borderRadius: 8,
+                  border: 'none',
+                  background: '#22c55e',
+                  color: '#ffffff',
+                  fontSize: 12,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  boxShadow: '0 2px 6px rgba(34,197,94,0.3)',
+                  transition: 'all 0.15s ease',
+                }}
+                title="Select brands and share PDF report via WhatsApp"
+              >
+                <MessageCircle size={15} /> WhatsApp (PDF)
+              </button>
+
               {/* Export Excel Button (Exports active scope) */}
               <button
                 onClick={handleExportExcel}
@@ -1635,6 +1844,17 @@ export function Reports() {
           </div>
         </div>
       </div>
+
+      {/* Brand Selector Report Modal for WhatsApp & Custom Exports */}
+      <BrandSelectorReportModal
+        isOpen={showBrandSelectorModal}
+        onClose={() => setShowBrandSelectorModal(false)}
+        brandSummaries={brandSummaries}
+        agencyName={agencyName}
+        awCode={agency?.aw_code}
+        reportTitle={REPORT_CONFIG[activeReportType]?.title || 'Britannia_Stock_Audit'}
+        getReportDataForBrands={getReportDataForBrands}
+      />
 
       {/* Notification Alert Modal */}
       <AlertModal
