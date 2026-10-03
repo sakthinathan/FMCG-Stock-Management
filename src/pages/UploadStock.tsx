@@ -58,7 +58,7 @@ export function UploadStock() {
         .update({ status: 'active' })
         .eq('id', upload.id);
 
-      setActiveUpload(upload.id, upload.file_name, upload.uploaded_at);
+      setActiveUpload(upload.id, upload.file_name, upload.uploaded_at, currentAgencyId);
       await broadcastStockCheckActivated(currentAgencyId, upload.id, upload.file_name, upload.uploaded_at);
       fetchHistory();
     } catch (e) {
@@ -153,7 +153,7 @@ export function UploadStock() {
       }
 
       setParseResult(result);
-      setActiveUpload(uploadData.id, formattedFileName, uploadData.uploaded_at);
+      setActiveUpload(uploadData.id, formattedFileName, uploadData.uploaded_at, currentAgencyId);
 
       // 3. Broadcast newly activated upload to all team members' devices
       if (currentAgencyId) {

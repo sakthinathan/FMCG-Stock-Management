@@ -42,19 +42,25 @@ export function Settings() {
         .select('*', { count: 'exact', head: true })
         .eq('agency_id', currentAgencyId);
 
-      const { count: sCount } = await supabase
+      const { count: sCount, data: agencySess } = await supabase
         .from('stock_count_sessions')
-        .select('*', { count: 'exact', head: true })
+        .select('id', { count: 'exact' })
         .eq('agency_id', currentAgencyId);
 
-      const { count: cCount } = await supabase
-        .from('physical_stock_counts')
-        .select('*', { count: 'exact', head: true });
+      const sessIds = (agencySess || []).map(s => s.id);
+      let cCount = 0;
+      if (sessIds.length > 0) {
+        const { count } = await supabase
+          .from('physical_stock_counts')
+          .select('*', { count: 'exact', head: true })
+          .in('session_id', sessIds);
+        cCount = count || 0;
+      }
 
       setResetCounts({
         uploads: uCount || 0,
         sessions: sCount || 0,
-        counts: cCount || 0,
+        counts: cCount,
       });
     } catch (e) {
       console.error('Error fetching reset counts:', e);

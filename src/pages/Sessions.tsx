@@ -37,9 +37,15 @@ export function Sessions() {
           .eq('upload_id', activeUploadId)
           .order('count_date', { ascending: false });
 
-        const { data: countsData } = await supabase
-          .from('physical_stock_counts')
-          .select('session_id');
+        const sessIds = (sessData || []).map(s => s.id);
+        let countsData: { session_id: string }[] = [];
+        if (sessIds.length > 0) {
+          const { data: cData } = await supabase
+            .from('physical_stock_counts')
+            .select('session_id')
+            .in('session_id', sessIds);
+          if (cData) countsData = cData;
+        }
 
         const { data: snapData } = await supabase
           .from('system_stock_snapshots')

@@ -91,12 +91,13 @@ export function useStockRealtimeSync(
         .from('stock_uploads')
         .select('id, status, file_name, uploaded_at')
         .eq('id', currentId)
+        .eq('agency_id', agencyId)
         .maybeSingle();
 
       if (error) return;
 
       if (!data || data.status === 'closed') {
-        // Stock check was closed on another device or removed!
+        // Stock check was closed on another device, belongs to another agency, or removed!
         clearActiveUpload();
         if (options?.onStockCheckClosed) {
           options.onStockCheckClosed(currentId);
@@ -110,12 +111,16 @@ export function useStockRealtimeSync(
   useEffect(() => {
     if (!agencyId) return;
 
+    // Ensure store is scoped to this agency immediately
+    useStockStore.getState().ensureAgency(agencyId);
+
     const channelName = `agency_sync_${agencyId}`;
     const channel = supabase.channel(channelName);
 
-    // 1. Listen for broadcast events across mobile & desktop devices
+    // 1. Listen for broadcast events across mobile & desktop devices (with strict agencyId verification)
     channel
       .on('broadcast', { event: 'STOCK_CHECK_CLOSED' }, (payload: any) => {
+        if (payload.payload?.agencyId && payload.payload.agencyId !== agencyId) return;
         const closedUploadId = payload.payload?.uploadId;
         if (!closedUploadId || closedUploadId === activeUploadIdRef.current) {
           clearActiveUpload();
@@ -125,9 +130,10 @@ export function useStockRealtimeSync(
         }
       })
       .on('broadcast', { event: 'STOCK_CHECK_ACTIVATED' }, (payload: any) => {
+        if (payload.payload?.agencyId && payload.payload.agencyId !== agencyId) return;
         const { uploadId, fileName, uploadedAt } = payload.payload || {};
         if (uploadId && uploadId !== activeUploadIdRef.current) {
-          setActiveUpload(uploadId, fileName, uploadedAt);
+          setActiveUpload(uploadId, fileName, uploadedAt, agencyId);
           if (options?.onStockCheckActivated) {
             options.onStockCheckActivated(uploadId, fileName, uploadedAt);
           }
