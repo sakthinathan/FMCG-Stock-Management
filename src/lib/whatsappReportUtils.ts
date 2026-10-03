@@ -72,9 +72,94 @@ export function formatWhatsAppAuditSummary(params: WhatsAppSummaryParams): strin
 }
 
 /**
- * Shares the audit report to WhatsApp.
- * - On Mobile (Android / iOS): Invokes native navigator.share with the PDF File and text message attached together.
- * - On Desktop: Downloads the PDF and opens WhatsApp Web link with pre-drafted text.
+ * Detects if the current user agent is a mobile device.
+ */
+export function isMobileDevice(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+}
+
+/**
+ * Returns the exact WhatsApp URL:
+ * - Mobile: https://api.whatsapp.com/send?text=... (opens WhatsApp App directly)
+ * - Desktop: https://web.whatsapp.com/send?text=... (opens WhatsApp Web directly)
+ */
+export function getWhatsAppShareUrl(messageText: string, recipientPhone?: string): string {
+  const encodedText = encodeURIComponent(messageText);
+  const cleanPhone = recipientPhone ? recipientPhone.replace(/[^0-9]/g, '') : '';
+  const phoneParam = cleanPhone ? (cleanPhone.startsWith('91') ? cleanPhone : '91' + cleanPhone) : '';
+  const isMobile = isMobileDevice();
+
+  if (isMobile) {
+    return phoneParam
+      ? `https://api.whatsapp.com/send?phone=${phoneParam}&text=${encodedText}`
+      : `https://api.whatsapp.com/send?text=${encodedText}`;
+  } else {
+    // Desktop: Direct WhatsApp Web
+    return phoneParam
+      ? `https://web.whatsapp.com/send?phone=${phoneParam}&text=${encodedText}`
+      : `https://web.whatsapp.com/send?text=${encodedText}`;
+  }
+}
+
+/**
+ * Copies text safely to the clipboard.
+ */
+export async function copyToClipboard(text: string): Promise<boolean> {
+  if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch (err) {
+      console.warn('Clipboard write failed, attempting fallback', err);
+    }
+  }
+
+  // Fallback using textarea
+  try {
+    const textArea = document.createElement('textarea');
+    textArea.value = text;
+    textArea.style.position = 'fixed';
+    textArea.style.left = '-999999px';
+    textArea.style.top = '-999999px';
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+    const successful = document.execCommand('copy');
+    document.body.removeChild(textArea);
+    return successful;
+  } catch (err) {
+    console.error('Fallback clipboard copy failed', err);
+    return false;
+  }
+}
+
+/**
+ * Opens a URL reliably, circumventing strict browser popup blockers via dynamic anchor click.
+ */
+export function navigateToUrl(url: string): boolean {
+  try {
+    const link = document.createElement('a');
+    link.href = url;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    return true;
+  } catch (e) {
+    console.warn('Anchor click failed, using window.open fallback:', e);
+    const win = window.open(url, '_blank', 'noopener,noreferrer');
+    return !!win;
+  }
+}
+
+/**
+ * Shares the audit report to WhatsApp:
+ * 1. Automatically copies the formatted summary text to clipboard so mobile users can
+ *    instantly paste it in WhatsApp chat along with the attached PDF.
+ * 2. On Mobile: Invokes native Web Share API with the PDF file.
+ * 3. On Desktop: Downloads the PDF report and immediately redirects to WhatsApp Web.
  */
 export async function shareReportToWhatsApp(
   messageText: string,
@@ -83,7 +168,10 @@ export async function shareReportToWhatsApp(
     recipientPhone?: string;
     onDownloadTriggered?: () => void;
   }
-): Promise<{ success: boolean; method: 'native_share' | 'web_link'; error?: string }> {
+): Promise<{ success: boolean; method: 'native_share' | 'web_link'; error?: string; waUrl?: string }> {
+  // Always copy summary text to clipboard first so mobile and desktop users can paste it anytime
+  await copyToClipboard(messageText);
+
   // 1. Try Native Web Share API if supported and has PDF file (Mobile Chrome, Safari, Edge)
   if (
     typeof navigator !== 'undefined' &&
@@ -101,7 +189,6 @@ export async function shareReportToWhatsApp(
       return { success: true, method: 'native_share' };
     } catch (err: any) {
       if (err.name === 'AbortError') {
-        // User cancelled share sheet, not a failure
         return { success: false, method: 'native_share', error: 'Share cancelled' };
       }
       console.warn('Native share failed, falling back to WhatsApp Web link:', err);
@@ -110,21 +197,13 @@ export async function shareReportToWhatsApp(
 
   // 2. Fallback for Desktop / WhatsApp Web link
   try {
-    // If PDF file is available and onDownloadTriggered is provided, trigger download
     if (pdfFile && options?.onDownloadTriggered) {
       options.onDownloadTriggered();
     }
 
-    const encodedText = encodeURIComponent(messageText);
-    const cleanPhone = options?.recipientPhone ? options.recipientPhone.replace(/[^0-9]/g, '') : '';
-    const phoneParam = cleanPhone ? `${cleanPhone.startsWith('91') ? cleanPhone : '91' + cleanPhone}` : '';
-
-    const waUrl = phoneParam
-      ? `https://wa.me/${phoneParam}?text=${encodedText}`
-      : `https://wa.me/?text=${encodedText}`;
-
-    window.open(waUrl, '_blank');
-    return { success: true, method: 'web_link' };
+    const waUrl = getWhatsAppShareUrl(messageText, options?.recipientPhone);
+    navigateToUrl(waUrl);
+    return { success: true, method: 'web_link', waUrl };
   } catch (err: any) {
     console.error('Failed to open WhatsApp:', err);
     return { success: false, method: 'web_link', error: err.message || 'Failed to open WhatsApp' };

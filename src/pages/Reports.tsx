@@ -875,7 +875,7 @@ export function Reports() {
         description="Unified analytics hub: preview discrepancies in real-time, inspect CBB and PCS quantities, and export verified Excel or PDF reports"
         icon={FileSpreadsheet}
         actions={
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          <div className="reports-header-actions" style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
             {/* Direct WhatsApp Report with Brand Selector & PDF attachment */}
             <button
               onClick={() => setShowBrandSelectorModal(true)}
@@ -980,7 +980,7 @@ export function Reports() {
       />
 
       {/* 2. Control Filter Panel with Brand Scope Switcher */}
-      <div style={{ ...CARD_BOX, padding: '16px 20px', display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 14 }}>
+      <div className="reports-filter-panel" style={{ ...CARD_BOX, padding: '16px 20px', display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 14 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
           {/* Select Upload */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -1009,7 +1009,7 @@ export function Reports() {
           </div>
 
           {/* Audit Scope Switcher (All vs Completed Only vs Counted Only) */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 3, background: '#f1f5f9', padding: 3, borderRadius: 9, border: '1px solid #e2e8f0' }}>
+          <div className="reports-scope-switcher" style={{ display: 'flex', alignItems: 'center', gap: 3, background: '#f1f5f9', padding: 3, borderRadius: 9, border: '1px solid #e2e8f0' }}>
             <button
               onClick={() => { setBrandScope('all'); setSelectedBrand('All Brands'); }}
               style={{
@@ -1210,7 +1210,7 @@ export function Reports() {
       )}
 
       {/* 3. Executive KPI Cards (CBB & PCS Operational Quantities) */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: 14 }}>
+      <div className="reports-kpi-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12 }}>
         {[
           {
             label: 'Total SKUs in Scope',
@@ -1253,15 +1253,17 @@ export function Reports() {
 
       {/* 4. Unified Report Hub */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-        {/* Segmented Tab Navigation Bar */}
+        {/* Segmented Tab Navigation Bar (Flex-scroll on mobile to eliminate overlap) */}
         <div
+          className="reports-tab-nav"
           style={{
             ...CARD_BOX,
             padding: 8,
-            display: 'grid',
-            gridTemplateColumns: `repeat(${compareMode ? 7 : 6}, minmax(0, 1fr))`,
-            gap: 8,
+            display: 'flex',
             overflowX: 'auto',
+            gap: 8,
+            WebkitOverflowScrolling: 'touch',
+            scrollbarWidth: 'none',
           }}
         >
           {(Object.keys(REPORT_CONFIG) as ReportType[])
@@ -1274,6 +1276,7 @@ export function Reports() {
               return (
                 <button
                   key={type}
+                  className="reports-tab-btn"
                   onClick={() => {
                     setActiveReportType(type);
                     setSearchQuery('');
@@ -1291,7 +1294,8 @@ export function Reports() {
                     transition: 'all 0.15s ease',
                     textAlign: 'left',
                     boxShadow: isActive ? `0 4px 12px ${cfg.color}18` : 'none',
-                    minWidth: 140,
+                    flex: '1 0 145px',
+                    minWidth: 145,
                   }}
                 >
                   <div style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
@@ -1358,6 +1362,7 @@ export function Reports() {
         <div style={{ ...CARD_BOX, overflow: 'hidden' }}>
           {/* Toolbar Header */}
           <div
+            className="reports-table-toolbar"
             style={{
               padding: '16px 20px',
               borderBottom: '1px solid #f1f5f9',
@@ -1415,9 +1420,10 @@ export function Reports() {
             </div>
 
             {/* Actions: In-Table Search & Dual Export Buttons */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            <div className="reports-table-actions" style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
               {/* Search Box */}
               <div
+                className="reports-search-box"
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -1458,79 +1464,82 @@ export function Reports() {
                 )}
               </div>
 
-              {/* WhatsApp Share Button */}
-              <button
-                onClick={() => setShowBrandSelectorModal(true)}
-                style={{
-                  padding: '8px 14px',
-                  borderRadius: 8,
-                  border: 'none',
-                  background: '#22c55e',
-                  color: '#ffffff',
-                  fontSize: 12,
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  fontFamily: 'inherit',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 6,
-                  boxShadow: '0 2px 6px rgba(34,197,94,0.3)',
-                  transition: 'all 0.15s ease',
-                }}
-                title="Select brands and share PDF report via WhatsApp"
-              >
-                <MessageCircle size={15} /> WhatsApp (PDF)
-              </button>
+              {/* Export Buttons Container */}
+              <div className="reports-export-btns" style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                {/* WhatsApp Share Button */}
+                <button
+                  onClick={() => setShowBrandSelectorModal(true)}
+                  style={{
+                    padding: '8px 14px',
+                    borderRadius: 8,
+                    border: 'none',
+                    background: '#22c55e',
+                    color: '#ffffff',
+                    fontSize: 12,
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    fontFamily: 'inherit',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    boxShadow: '0 2px 6px rgba(34,197,94,0.3)',
+                    transition: 'all 0.15s ease',
+                  }}
+                  title="Select brands and share PDF report via WhatsApp"
+                >
+                  <MessageCircle size={15} /> WhatsApp (PDF)
+                </button>
 
-              {/* Export Excel Button (Exports active scope) */}
-              <button
-                onClick={handleExportExcel}
-                disabled={downloadingType === 'excel' || activeReportRows.length === 0}
-                style={{
-                  padding: '8px 16px',
-                  borderRadius: 8,
-                  border: '1px solid #bbf7d0',
-                  background: '#f0fdf4',
-                  color: '#166534',
-                  fontSize: 12,
-                  fontWeight: 700,
-                  cursor: downloadingType === 'excel' || activeReportRows.length === 0 ? 'not-allowed' : 'pointer',
-                  fontFamily: 'inherit',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 6,
-                  transition: 'all 0.15s ease',
-                }}
-                title={brandScope === 'completed' ? 'Export Excel for Completed Brands only' : 'Export Excel for current view'}
-              >
-                <FileSpreadsheet size={15} color="#16a34a" />
-                {downloadingType === 'excel' ? 'Exporting...' : 'Export Excel (.xlsx)'}
-              </button>
+                {/* Export Excel Button (Exports active scope) */}
+                <button
+                  onClick={handleExportExcel}
+                  disabled={downloadingType === 'excel' || activeReportRows.length === 0}
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: 8,
+                    border: '1px solid #bbf7d0',
+                    background: '#f0fdf4',
+                    color: '#166534',
+                    fontSize: 12,
+                    fontWeight: 700,
+                    cursor: downloadingType === 'excel' || activeReportRows.length === 0 ? 'not-allowed' : 'pointer',
+                    fontFamily: 'inherit',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    transition: 'all 0.15s ease',
+                  }}
+                  title={brandScope === 'completed' ? 'Export Excel for Completed Brands only' : 'Export Excel for current view'}
+                >
+                  <FileSpreadsheet size={15} color="#16a34a" />
+                  {downloadingType === 'excel' ? 'Exporting...' : 'Export Excel (.xlsx)'}
+                </button>
 
-              {/* Download PDF Button */}
-              <button
-                onClick={() => handleExportPdf()}
-                disabled={downloadingType === 'pdf' || activeReportRows.length === 0}
-                style={{
-                  padding: '8px 16px',
-                  borderRadius: 8,
-                  border: '1px solid #e52321',
-                  background: '#e52321',
-                  color: '#ffffff',
-                  fontSize: 12,
-                  fontWeight: 700,
-                  cursor: downloadingType === 'pdf' || activeReportRows.length === 0 ? 'not-allowed' : 'pointer',
-                  fontFamily: 'inherit',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 6,
-                  boxShadow: '0 2px 6px rgba(229,35,33,0.2)',
-                  transition: 'all 0.15s ease',
-                }}
-              >
-                <Download size={15} color="#ffffff" />
-                {downloadingType === 'pdf' ? 'Generating PDF...' : 'Download PDF (.pdf)'}
-              </button>
+                {/* Download PDF Button */}
+                <button
+                  onClick={() => handleExportPdf()}
+                  disabled={downloadingType === 'pdf' || activeReportRows.length === 0}
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: 8,
+                    border: '1px solid #e52321',
+                    background: '#e52321',
+                    color: '#ffffff',
+                    fontSize: 12,
+                    fontWeight: 700,
+                    cursor: downloadingType === 'pdf' || activeReportRows.length === 0 ? 'not-allowed' : 'pointer',
+                    fontFamily: 'inherit',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    boxShadow: '0 2px 6px rgba(229,35,33,0.2)',
+                    transition: 'all 0.15s ease',
+                  }}
+                >
+                  <Download size={15} color="#ffffff" />
+                  {downloadingType === 'pdf' ? 'Generating PDF...' : 'Download PDF (.pdf)'}
+                </button>
+              </div>
             </div>
           </div>
 
@@ -1864,6 +1873,77 @@ export function Reports() {
         type={alertConfig.type}
         onClose={() => setAlertConfig(prev => ({ ...prev, isOpen: false }))}
       />
+
+      {/* Responsive Styles for Mobile Reports Layout */}
+      <style>{`
+        @media (max-width: 768px) {
+          .reports-header-actions {
+            width: 100% !important;
+            display: grid !important;
+            grid-template-columns: repeat(2, 1fr) !important;
+            gap: 8px !important;
+          }
+          .reports-header-actions button {
+            width: 100% !important;
+            justify-content: center !important;
+            padding: 9px 8px !important;
+            font-size: 11px !important;
+          }
+          .reports-filter-panel {
+            padding: 12px 14px !important;
+            gap: 10px !important;
+          }
+          .reports-scope-switcher {
+            width: 100% !important;
+            overflow-x: auto !important;
+            -webkit-overflow-scrolling: touch !important;
+          }
+          .reports-kpi-grid {
+            grid-template-columns: repeat(2, 1fr) !important;
+            gap: 10px !important;
+          }
+          .reports-tab-nav {
+            padding: 6px !important;
+            gap: 6px !important;
+          }
+          .reports-tab-btn {
+            flex: 0 0 145px !important;
+            min-width: 145px !important;
+            padding: 10px 12px !important;
+          }
+          .reports-table-toolbar {
+            padding: 12px 14px !important;
+            flex-direction: column !important;
+            align-items: stretch !important;
+            gap: 12px !important;
+          }
+          .reports-table-actions {
+            width: 100% !important;
+            flex-direction: column !important;
+            align-items: stretch !important;
+            gap: 8px !important;
+          }
+          .reports-search-box {
+            width: 100% !important;
+          }
+          .reports-export-btns {
+            width: 100% !important;
+            display: flex !important;
+            gap: 6px !important;
+          }
+          .reports-export-btns button {
+            flex: 1 !important;
+            justify-content: center !important;
+            padding: 8px 6px !important;
+            font-size: 11px !important;
+          }
+        }
+        @media (max-width: 480px) {
+          .reports-header-actions {
+            grid-template-columns: 1fr !important;
+          }
+        }
+      `}</style>
     </div>
   );
 }

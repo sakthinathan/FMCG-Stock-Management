@@ -1,10 +1,18 @@
 import React, { useState, useMemo } from 'react';
 import {
   X, Search, CheckSquare, Square, FileText, FileSpreadsheet,
-  CheckCircle2, AlertTriangle, ChevronDown, ChevronUp, Share2, Sparkles, MessageCircle
+  CheckCircle2, AlertTriangle, ChevronDown, ChevronUp, Share2, Sparkles, MessageCircle,
+  Copy, Check, Send, ExternalLink
 } from 'lucide-react';
 import { StatusBadge } from './StatusBadge';
-import { formatWhatsAppAuditSummary, shareReportToWhatsApp } from '@/lib/whatsappReportUtils';
+import {
+  formatWhatsAppAuditSummary,
+  shareReportToWhatsApp,
+  copyToClipboard,
+  getWhatsAppShareUrl,
+  navigateToUrl,
+  isMobileDevice,
+} from '@/lib/whatsappReportUtils';
 import { generateReportPdfFile, exportReportToPdf, exportDataToExcel } from '@/lib/reportExportUtils';
 import { calculateCbbPcs, formatCbbPcs } from '@/lib/cbbUtils';
 
@@ -43,6 +51,8 @@ export function BrandSelectorReportModal({
   const [showPreviewMessage, setShowPreviewMessage] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
   const [statusNotice, setStatusNotice] = useState<string | null>(null);
+  const [copiedSummary, setCopiedSummary] = useState(false);
+  const [lastWaUrl, setLastWaUrl] = useState<string | null>(null);
 
   // Completed & Counted presets
   const completedBrands = useMemo(() => {
@@ -179,16 +189,23 @@ export function BrandSelectorReportModal({
         },
       });
 
+      if (shareResult.waUrl) {
+        setLastWaUrl(shareResult.waUrl);
+      }
+
       if (shareResult.method === 'web_link') {
-        setStatusNotice('PDF report downloaded! Opening WhatsApp Web...');
+        setStatusNotice('PDF report downloaded! WhatsApp Web opened in a new tab. (Summary text copied to clipboard)');
       } else {
-        setStatusNotice('Shared report to WhatsApp successfully!');
+        setStatusNotice('📋 Summary copied to clipboard! In WhatsApp, simply tap Paste to send the summary text along with the attached PDF.');
       }
 
       setTimeout(() => {
         setIsSharing(false);
+      }, 1500);
+
+      setTimeout(() => {
         setStatusNotice(null);
-      }, 3000);
+      }, 7000);
     } catch (e: any) {
       console.error('Error sharing report to WhatsApp:', e);
       setIsSharing(false);
@@ -196,7 +213,28 @@ export function BrandSelectorReportModal({
     }
   };
 
-  // 2. Download PDF for Selected Brands
+  // 2. 1-Click Copy Summary Text to Clipboard
+  const handleCopySummary = async () => {
+    const success = await copyToClipboard(whatsappMessageText);
+    if (success) {
+      setCopiedSummary(true);
+      setStatusNotice('📋 Audit summary text copied to clipboard! You can paste it into any WhatsApp chat or email.');
+      setTimeout(() => setCopiedSummary(false), 2500);
+      setTimeout(() => setStatusNotice(null), 5000);
+    }
+  };
+
+  // 3. Send WhatsApp Summary Text Only (Instant 1-Click Redirect)
+  const handleSendWhatsAppTextOnly = async () => {
+    await copyToClipboard(whatsappMessageText);
+    const waUrl = getWhatsAppShareUrl(whatsappMessageText);
+    setLastWaUrl(waUrl);
+    navigateToUrl(waUrl);
+    setStatusNotice('Opening WhatsApp with summary message text pre-drafted...');
+    setTimeout(() => setStatusNotice(null), 4000);
+  };
+
+  // 4. Download PDF for Selected Brands
   const handleDownloadPdf = () => {
     if (selectedBrandList.length === 0) return;
     exportReportToPdf(
@@ -207,7 +245,7 @@ export function BrandSelectorReportModal({
     );
   };
 
-  // 3. Export Excel for Selected Brands
+  // 5. Export Excel for Selected Brands
   const handleExportExcel = () => {
     if (selectedBrandList.length === 0) return;
     exportDataToExcel(rows, 'custom', 'Stock_Selected_Brands');
@@ -452,7 +490,12 @@ export function BrandSelectorReportModal({
               <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <MessageCircle size={15} color="#16a34a" /> Preview WhatsApp Message Text
               </span>
-              {showPreviewMessage ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ fontSize: 11, color: '#64748b', fontWeight: 500 }}>
+                  {showPreviewMessage ? 'Hide' : 'View & Copy'}
+                </span>
+                {showPreviewMessage ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+              </div>
             </button>
 
             {showPreviewMessage && (
@@ -460,30 +503,81 @@ export function BrandSelectorReportModal({
                 <pre style={{
                   margin: 0, fontSize: 11, color: '#1e293b', whiteSpace: 'pre-wrap',
                   fontFamily: 'monospace', background: '#f1f5f9', padding: '10px 12px',
-                  borderRadius: 8, lineHeight: 1.5, maxHeight: 160, overflowY: 'auto'
+                  borderRadius: 8, lineHeight: 1.5, maxHeight: 150, overflowY: 'auto'
                 }}>
                   {whatsappMessageText}
                 </pre>
+
+                {/* Quick actions for summary text */}
+                <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    onClick={handleCopySummary}
+                    style={{
+                      padding: '6px 12px', borderRadius: 7, border: '1px solid #cbd5e1',
+                      background: copiedSummary ? '#f0fdf4' : '#ffffff',
+                      color: copiedSummary ? '#15803d' : '#334155',
+                      fontSize: 11, fontWeight: 700, cursor: 'pointer',
+                      display: 'flex', alignItems: 'center', gap: 5, transition: 'all 0.15s ease'
+                    }}
+                  >
+                    {copiedSummary ? <Check size={13} color="#16a34a" /> : <Copy size={13} />}
+                    {copiedSummary ? 'Copied to Clipboard!' : 'Copy Summary Text'}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleSendWhatsAppTextOnly}
+                    style={{
+                      padding: '6px 12px', borderRadius: 7, border: '1px solid #bbf7d0',
+                      background: '#f0fdf4', color: '#15803d',
+                      fontSize: 11, fontWeight: 700, cursor: 'pointer',
+                      display: 'flex', alignItems: 'center', gap: 5
+                    }}
+                  >
+                    <Send size={13} />
+                    Send Summary Message Only
+                  </button>
+                </div>
               </div>
             )}
           </div>
 
-          {/* Status notice */}
+          {/* Status notice with direct link backup */}
           {statusNotice && (
             <div style={{
-              padding: '8px 12px', borderRadius: 8, background: '#eff6ff',
+              padding: '10px 14px', borderRadius: 10, background: '#eff6ff',
               border: '1px solid #bfdbfe', fontSize: 12, fontWeight: 600, color: '#1d4ed8',
-              textAlign: 'center'
+              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, textAlign: 'center'
             }}>
-              {statusNotice}
+              <div>{statusNotice}</div>
+              {lastWaUrl && (
+                <button
+                  type="button"
+                  onClick={() => navigateToUrl(lastWaUrl)}
+                  style={{
+                    padding: '4px 10px', borderRadius: 6, border: '1px solid #93c5fd',
+                    background: '#ffffff', color: '#1d4ed8', fontSize: 11, fontWeight: 700,
+                    cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4
+                  }}
+                >
+                  <ExternalLink size={12} /> Open WhatsApp Web Now
+                </button>
+              )}
             </div>
           )}
 
         </div>
 
         {/* Footer Actions */}
-        <div style={{ padding: '14px 22px', borderTop: '1px solid #f1f5f9', background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div
+          className="brand-modal-footer"
+          style={{
+            padding: '14px 20px', borderTop: '1px solid #f1f5f9', background: '#f8fafc',
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap'
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }} className="brand-modal-secondary-actions">
             {/* Download PDF button */}
             <button
               type="button"
@@ -515,6 +609,21 @@ export function BrandSelectorReportModal({
             >
               <FileSpreadsheet size={15} color="#16a34a" /> Excel
             </button>
+
+            {/* 1-Click Copy Summary Button */}
+            <button
+              type="button"
+              onClick={handleCopySummary}
+              style={{
+                padding: '9px 12px', borderRadius: 9, fontSize: 12, fontWeight: 700,
+                cursor: 'pointer', border: '1px solid #cbd5e1', background: copiedSummary ? '#f0fdf4' : '#fff',
+                color: copiedSummary ? '#15803d' : '#475569', display: 'flex', alignItems: 'center', gap: 5
+              }}
+              title="Copy audit summary message to clipboard"
+            >
+              {copiedSummary ? <Check size={14} color="#16a34a" /> : <Copy size={14} />}
+              {copiedSummary ? 'Copied' : 'Copy Text'}
+            </button>
           </div>
 
           {/* Primary Action: Share on WhatsApp with PDF attached */}
@@ -522,6 +631,7 @@ export function BrandSelectorReportModal({
             type="button"
             disabled={selectedBrandList.length === 0 || isSharing}
             onClick={handleShareWhatsApp}
+            className="brand-modal-primary-action"
             style={{
               padding: '10px 18px', borderRadius: 10, fontSize: 13, fontWeight: 800,
               cursor: selectedBrandList.length === 0 || isSharing ? 'not-allowed' : 'pointer',
@@ -532,9 +642,32 @@ export function BrandSelectorReportModal({
             }}
           >
             <Share2 size={16} />
-            {isSharing ? 'Sharing...' : 'Share to WhatsApp (PDF + Summary)'}
+            {isSharing ? 'Preparing...' : 'Share to WhatsApp (PDF + Summary)'}
           </button>
         </div>
+
+        <style>{`
+          @media (max-width: 600px) {
+            .brand-modal-footer {
+              flex-direction: column-reverse !important;
+              align-items: stretch !important;
+            }
+            .brand-modal-primary-action {
+              width: 100% !important;
+              justify-content: center !important;
+            }
+            .brand-modal-secondary-actions {
+              width: 100% !important;
+              justify-content: space-between !important;
+            }
+            .brand-modal-secondary-actions button {
+              flex: 1 !important;
+              justify-content: center !important;
+              padding: 8px 6px !important;
+              font-size: 11px !important;
+            }
+          }
+        `}</style>
 
       </div>
     </div>
